@@ -7,7 +7,7 @@ export default function Home() {
   return (
     <div>
       <nav className="navbar">
-        <div className="nav-logo">ADVITYA '26</div>
+        <div className="nav-logo">GFG Student Chapter Present</div>
         <button onClick={() => navigate("/login")} className="nav-btn">LOGIN</button>
       </nav>
 
@@ -53,4 +53,5 @@ export default function Home() {
       </footer>
     </div>
   );
+
 }
