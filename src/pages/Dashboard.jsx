@@ -8,6 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { GAME_DATABASE } from "../gameConfig"; 
 import "./Dashboard.css"; 
 
+// --- CONFIGURATION ---
+const CHAOS_DURATION_SEC = 600; // 10 Minutes
+const GAME_DURATION_SEC = 600;  // 10 Minutes
+
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -16,56 +20,123 @@ export default function Dashboard() {
   
   // LAYER 1: CHAOS ROOM STATE
   const [activeChaosRule, setActiveChaosRule] = useState("SIT-STAND");
-  const [chaosPenalty, setChaosPenalty] = useState(1); // Starts at -1, then -3, -5...
+  const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
+  
+  // ACTIVE GAME TIMER STATE
+  const [gameTimeLeft, setGameTimeLeft] = useState(null);
   
   // LOGS
   const [systemLogs, setSystemLogs] = useState([]);
 
-  // --- 1. INITIALIZATION ---
+  // --- HELPER: FORMAT TIME (MM:SS) ---
+  const formatTime = (seconds) => {
+    if (seconds < 0) return "00:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // --- 1. INITIALIZATION & DATA SYNC ---
   useEffect(() => {
     if (!currentUser?.uid) return;
 
     // A. Listen to Database
     const unsub = onSnapshot(doc(db, "users", currentUser.uid), (doc) => {
-      setPlayerData(doc.data());
+      const data = doc.data();
+      setPlayerData(data);
+
+      // Check if there is an active game to sync timer
+      if (data?.activeGame?.startedAt) {
+        // Calculate how much time has passed since server start time
+        const startTime = data.activeGame.startedAt.toDate().getTime(); // Firebase Timestamp to JS Date
+        const now = Date.now();
+        const elapsedSec = Math.floor((now - startTime) / 1000);
+        const remaining = GAME_DURATION_SEC - elapsedSec;
+        setGameTimeLeft(remaining > 0 ? remaining : 0);
+      } else {
+        setGameTimeLeft(null);
+      }
     });
 
-    // B. Chaos Rule Rotator (Changes every 5 minutes in real life, or static for now)
-    const rules = ["FLOOR IS LAVA", "SIT-STAND", "COMPLETE SILENCE", "SLOW MOTION"];
-    const ruleInterval = setInterval(() => {
-        const randomRule = rules[Math.floor(Math.random() * rules.length)];
-        setActiveChaosRule(randomRule);
-        addLog(`CHAOS EVENT: ${randomRule} ACTIVE`);
-    }, 60000); // Changes every 60 seconds for demo
-
-    return () => { unsub(); clearInterval(ruleInterval); };
+    return () => unsub();
   }, [currentUser]);
 
-  // Helper to add logs
+  // --- 2. CHAOS TIMER LOGIC ---
+  useEffect(() => {
+    // Determine Rules
+    const rules = ["FLOOR IS LAVA", "SIT-STAND", "COMPLETE SILENCE", "SLOW MOTION", "ONE HAND ONLY"];
+    
+    const timer = setInterval(() => {
+        setChaosTimeLeft((prev) => {
+            if (prev <= 1) {
+                // Time is up, switch rule and reset timer
+                const randomRule = rules[Math.floor(Math.random() * rules.length)];
+                setActiveChaosRule(randomRule);
+                addLog(`CHAOS EVENT: ${randomRule} ACTIVE`);
+                return CHAOS_DURATION_SEC; // Reset to 10 mins
+            }
+            return prev - 1;
+        });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // --- 3. GAME TIMER LOGIC ---
+  useEffect(() => {
+    if (gameTimeLeft === null) return; // No game active
+
+    if (gameTimeLeft <= 0) {
+        handleGameExpiry();
+        return;
+    }
+
+    const gameTimer = setInterval(() => {
+        setGameTimeLeft((prev) => {
+            if (prev <= 1) {
+                handleGameExpiry();
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+
+    return () => clearInterval(gameTimer);
+  }, [gameTimeLeft]);
+
+  // --- ACTIONS ---
+
   const addLog = (msg) => {
     const time = new Date().toLocaleTimeString();
     setSystemLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
   };
 
-  // --- 2. GAMEPLAY LOGIC ---
+  // EXPIRE GAME (When timer hits 0)
+  const handleGameExpiry = async () => {
+    if (!playerData?.activeGame) return;
+    
+    // Clear the active game in DB
+    const userRef = doc(db, "users", currentUser.uid);
+    await updateDoc(userRef, {
+        activeGame: null
+    });
+    
+    addLog(`MISSION FAILED: TIME EXPIRED`);
+    alert("TIME IS UP. GAME OVER.");
+  };
 
   // ROLL DICE (Enter Layer 2)
   const rollDice = async (category) => {
-    // ALTERNATING RULE CHECK
-    const lastCategory = playerData.lastPlayedCategory; // We need to store this in DB
+    const lastCategory = playerData.lastPlayedCategory;
     
-    // If attempting to play the same category twice in a row (and hasn't paid to unlock)
     if (lastCategory === category && !playerData.unlockedSameCategory) {
-        alert("PROTOCOL VIOLATION: You must alternate categories (Heart ↔ Spade). Pay 2 tokens to bypass.");
+        alert("PROTOCOL VIOLATION: You must alternate categories. Pay 2 tokens to bypass.");
         return;
     }
 
     setLoadingDice(true);
     setTimeout(async () => {
       try {
-        // Generate Level (User gets to choose difficulty in your doc, but dice is cooler. 
-        // Let's stick to Dice for randomness, or we can make them choose. 
-        // Logic: Dice decides difficulty 1-6)
         const level = Math.floor(Math.random() * 6) + 1;
         const gameId = `${category}_${level}`;
         const userRef = doc(db, "users", currentUser.uid);
@@ -73,10 +144,10 @@ export default function Dashboard() {
         await updateDoc(userRef, {
             activeGame: {
                 category, level, gameId,
-                startedAt: serverTimestamp()
+                startedAt: serverTimestamp() // This timestamp drives the timer
             },
             lastPlayedCategory: category,
-            unlockedSameCategory: false // Reset the unlock flag
+            unlockedSameCategory: false
         });
         addLog(`ENTERING BORDERLAND: ${category} LEVEL ${level}`);
 
@@ -95,11 +166,9 @@ export default function Dashboard() {
         return;
     }
     const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, {
-        tokens: increment(-2)
-    });
+    await updateDoc(userRef, { tokens: increment(-2) });
     addLog(`CHAOS RULE SKIPPED (-2 TOKENS)`);
-    alert("RULE BYPASSED. YOU ARE IMMUNE FOR THIS PHASE.");
+    alert("RULE BYPASSED. IMMUNE FOR THIS PHASE.");
   };
 
   // UNLOCK CATEGORY LOCK (-2 Tokens)
@@ -112,6 +181,12 @@ export default function Dashboard() {
     });
     addLog(`CATEGORY LOCK OVERRIDDEN (-2 TOKENS)`);
   };
+
+  // QUIT GAME MANUAL
+  const quitGame = async () => {
+      const confirm = window.confirm("Give up? There are no rewards for quitters.");
+      if(confirm) handleGameExpiry();
+  }
 
   const handleLogout = async () => { await signOut(auth); navigate("/"); };
 
@@ -132,14 +207,20 @@ export default function Dashboard() {
         <button onClick={handleLogout} style={{background:'transparent', border:'1px solid #0f0', color:'#0f0', cursor:'pointer'}}>EXIT</button>
       </header>
 
-      {/* LAYER 1: CHAOS RULE BANNER (Always Active) */}
+      {/* LAYER 1: CHAOS RULE BANNER (10 MIN TIMER) */}
       <div className="chaos-rule-strip">
         <div className="rule-display">
             <span className="rule-label">CURRENT RULE</span>
             <span className="active-rule-text">{activeChaosRule}</span>
         </div>
+        
+        {/* RULE TIMER */}
+        <div className="rule-timer" style={{fontFamily:'monospace', fontSize:'1.2rem', color: chaosTimeLeft < 60 ? 'red' : '#0f0'}}>
+            T-MINUS: {formatTime(chaosTimeLeft)}
+        </div>
+
         <button onClick={skipChaosRule} className="skip-btn">
-            SKIP RULE (-2 🪙)
+            SKIP (-2 🪙)
         </button>
       </div>
 
@@ -154,16 +235,37 @@ export default function Dashboard() {
                 {playerData.activeGame ? (
                     // ACTIVE GAME SCREEN
                     <div className="active-mission-screen">
+                         
+                         {/* GAME COUNTDOWN TIMER */}
+                         <div style={{
+                             fontSize: '3rem', 
+                             fontFamily: 'monospace', 
+                             color: gameTimeLeft < 60 ? '#ff0000' : '#fff',
+                             border: '2px solid currentColor',
+                             padding: '10px 20px',
+                             marginBottom: '20px',
+                             textShadow: '0 0 10px currentColor'
+                         }}>
+                             {formatTime(gameTimeLeft)}
+                         </div>
+
                          <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>LEVEL {playerData.activeGame.level}</h1>
                          <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff', textShadow:'0 0 10px currentColor'}}>
                             {GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}
                          </h2>
-                         <p style={{color:'#fff', maxWidth:'80%'}}>
+                         <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>
                             {GAME_DATABASE[playerData.activeGame.gameId]?.description}
                          </p>
                          <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>
                             LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}
                          </div>
+
+                         <button 
+                            onClick={quitGame}
+                            style={{marginTop:'20px', background:'#333', color:'#fff', border:'none', padding:'10px', cursor:'pointer'}}
+                         >
+                             FORFEIT GAME
+                         </button>
                     </div>
                 ) : (
                     // SELECTION SCREEN
@@ -182,7 +284,6 @@ export default function Dashboard() {
                                 <div style={{fontSize:'0.7rem', color:'#888'}}>SOCIAL / EMOTIONAL</div>
                             </button>
                             
-                            {/* LOCK OVERLAY (If played Heart last) */}
                             {playerData.lastPlayedCategory === "HEART" && !playerData.unlockedSameCategory && (
                                 <div className="locked-overlay">
                                     <span style={{color:'red', fontWeight:'bold'}}>LOCKED</span>
@@ -205,7 +306,6 @@ export default function Dashboard() {
                                 <div style={{fontSize:'0.7rem', color:'#888'}}>LOGIC / INTELLECT</div>
                             </button>
                              
-                            {/* LOCK OVERLAY (If played Spade last) */}
                             {playerData.lastPlayedCategory === "SPADE" && !playerData.unlockedSameCategory && (
                                 <div className="locked-overlay">
                                     <span style={{color:'#00ccff', fontWeight:'bold'}}>LOCKED</span>
