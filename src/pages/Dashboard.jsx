@@ -6,12 +6,13 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, increment } from "firebase
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { GAME_DATABASE } from "../gameConfig"; 
-import Leaderboard from "../components/Leaderboard"; // <--- IMPORT ADDED
+import Leaderboard from "../components/Leaderboard"; 
 import "./Dashboard.css"; 
 
 // --- CONFIGURATION ---
 const CHAOS_DURATION_SEC = 600; // 10 Minutes
 const GAME_DURATION_SEC = 600;  // 10 Minutes
+const CHAOS_RULES = ["FLOOR IS LAVA", "SIT-STAND", "COMPLETE SILENCE", "SLOW MOTION", "ONE HAND ONLY"];
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const [loadingDice, setLoadingDice] = useState(false);
    
   // LAYER 1: CHAOS ROOM STATE
-  const [activeChaosRule, setActiveChaosRule] = useState("SIT-STAND");
+  const [activeChaosRule, setActiveChaosRule] = useState("INITIALIZING...");
   const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
    
   // ACTIVE GAME TIMER STATE
@@ -62,23 +63,34 @@ export default function Dashboard() {
     return () => unsub();
   }, [currentUser]);
 
-  // --- 2. CHAOS TIMER LOGIC ---
+  // --- 2. CHAOS TIMER LOGIC (UPDATED FOR PERSISTENCE) ---
   useEffect(() => {
-    // Determine Rules
-    const rules = ["FLOOR IS LAVA", "SIT-STAND", "COMPLETE SILENCE", "SLOW MOTION", "ONE HAND ONLY"];
-    
-    const timer = setInterval(() => {
-        setChaosTimeLeft((prev) => {
-            if (prev <= 1) {
-                // Time is up, switch rule and reset timer
-                const randomRule = rules[Math.floor(Math.random() * rules.length)];
-                setActiveChaosRule(randomRule);
-                addLog(`CHAOS EVENT: ${randomRule} ACTIVE`);
-                return CHAOS_DURATION_SEC; // Reset to 10 mins
-            }
-            return prev - 1;
-        });
-    }, 1000);
+    const syncChaosTimer = () => {
+        const now = Math.floor(Date.now() / 1000); // Current seconds (Unix timestamp)
+        
+        // Calculate which 10-minute "Block" of time we are in
+        // This ensures the timer is the same for EVERYONE and survives refresh
+        const cycleIndex = Math.floor(now / CHAOS_DURATION_SEC);
+        
+        // Calculate seconds remaining in the current block
+        const elapsedInCycle = now % CHAOS_DURATION_SEC;
+        const remaining = CHAOS_DURATION_SEC - elapsedInCycle;
+        
+        // Pick a rule deterministically based on the Cycle Index
+        // Cycle 1 gets Rule 1, Cycle 2 gets Rule 2, etc.
+        // This ensures the rule doesn't change if you refresh.
+        const ruleIndex = cycleIndex % CHAOS_RULES.length;
+        const currentRule = CHAOS_RULES[ruleIndex];
+
+        setChaosTimeLeft(remaining);
+        setActiveChaosRule(currentRule);
+    };
+
+    // Run once immediately so we don't wait 1 second for the first update
+    syncChaosTimer();
+
+    // Update every second
+    const timer = setInterval(syncChaosTimer, 1000);
 
     return () => clearInterval(timer);
   }, []);
