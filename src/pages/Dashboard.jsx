@@ -6,6 +6,7 @@ import { doc, onSnapshot, updateDoc, serverTimestamp, increment } from "firebase
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { GAME_DATABASE } from "../gameConfig"; 
+import Leaderboard from "../components/Leaderboard"; // <--- IMPORT ADDED
 import "./Dashboard.css"; 
 
 // --- CONFIGURATION ---
@@ -17,14 +18,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [playerData, setPlayerData] = useState(null);
   const [loadingDice, setLoadingDice] = useState(false);
-  
+   
   // LAYER 1: CHAOS ROOM STATE
   const [activeChaosRule, setActiveChaosRule] = useState("SIT-STAND");
   const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
-  
+   
   // ACTIVE GAME TIMER STATE
   const [gameTimeLeft, setGameTimeLeft] = useState(null);
-  
+   
   // LOGS
   const [systemLogs, setSystemLogs] = useState([]);
 
@@ -194,7 +195,7 @@ export default function Dashboard() {
 
   return (
     <div className="chaos-room-shell">
-      
+       
       {/* HEADER */}
       <header className="chaos-header">
         <div className="system-status">
@@ -235,37 +236,37 @@ export default function Dashboard() {
                 {playerData.activeGame ? (
                     // ACTIVE GAME SCREEN
                     <div className="active-mission-screen">
-                         
-                         {/* GAME COUNTDOWN TIMER */}
-                         <div style={{
-                             fontSize: '3rem', 
-                             fontFamily: 'monospace', 
-                             color: gameTimeLeft < 60 ? '#ff0000' : '#fff',
-                             border: '2px solid currentColor',
-                             padding: '10px 20px',
-                             marginBottom: '20px',
-                             textShadow: '0 0 10px currentColor'
-                         }}>
-                             {formatTime(gameTimeLeft)}
-                         </div>
+                          
+                          {/* GAME COUNTDOWN TIMER */}
+                          <div style={{
+                              fontSize: '3rem', 
+                              fontFamily: 'monospace', 
+                              color: gameTimeLeft < 60 ? '#ff0000' : '#fff',
+                              border: '2px solid currentColor',
+                              padding: '10px 20px',
+                              marginBottom: '20px',
+                              textShadow: '0 0 10px currentColor'
+                          }}>
+                              {formatTime(gameTimeLeft)}
+                          </div>
 
-                         <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>LEVEL {playerData.activeGame.level}</h1>
-                         <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff', textShadow:'0 0 10px currentColor'}}>
-                            {GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}
-                         </h2>
-                         <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>
-                            {GAME_DATABASE[playerData.activeGame.gameId]?.description}
-                         </p>
-                         <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>
-                            LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}
-                         </div>
+                          <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>LEVEL {playerData.activeGame.level}</h1>
+                          <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff', textShadow:'0 0 10px currentColor'}}>
+                             {GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}
+                          </h2>
+                          <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>
+                             {GAME_DATABASE[playerData.activeGame.gameId]?.description}
+                          </p>
+                          <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>
+                             LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}
+                          </div>
 
-                         <button 
-                            onClick={quitGame}
-                            style={{marginTop:'20px', background:'#333', color:'#fff', border:'none', padding:'10px', cursor:'pointer'}}
-                         >
-                             FORFEIT GAME
-                         </button>
+                          <button 
+                             onClick={quitGame}
+                             style={{marginTop:'20px', background:'#333', color:'#fff', border:'none', padding:'10px', cursor:'pointer'}}
+                          >
+                              FORFEIT GAME
+                          </button>
                     </div>
                 ) : (
                     // SELECTION SCREEN
@@ -319,12 +320,30 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* RIGHT PANEL: System Logs */}
+            {/* RIGHT PANEL: LEADERBOARD & LOGS */}
             <div className="data-sidebar">
-                <div style={{borderBottom:'1px solid #0f0', marginBottom:'10px'}}>SYSTEM LOGS</div>
-                {systemLogs.map((log, i) => (
-                    <div key={i} className="log-entry">{log}</div>
-                ))}
+                {/* 1. LEADERBOARD SECTION */}
+                <div style={{marginBottom:'20px'}}>
+                   <div style={{
+                       borderBottom:'1px solid #0f0', 
+                       marginBottom:'10px',
+                       display:'flex',
+                       justifyContent:'space-between',
+                       color:'#0f0'
+                   }}>
+                       <span>LIVE RANKINGS</span>
+                       <span className="blink">● LIVE</span>
+                   </div>
+                   <Leaderboard limitCount={10} />
+                </div>
+
+                {/* 2. SYSTEM LOGS SECTION */}
+                <div style={{borderTop:'1px dashed #333', paddingTop:'10px'}}>
+                    <div style={{color:'#888', marginBottom:'5px', fontSize:'0.8rem'}}>SYSTEM LOGS</div>
+                    {systemLogs.map((log, i) => (
+                        <div key={i} className="log-entry">{log}</div>
+                    ))}
+                </div>
             </div>
 
         </div>
