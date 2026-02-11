@@ -1,12 +1,13 @@
+// src/components/Leaderboard.jsx
 import { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 
-// !! IMPORTANT: 'export default' is required here !!
-export default function Leaderboard({ limit: limitCount = 10 }) {
+export default function Leaderboard({ limitCount = 10 }) {
   const [leaders, setLeaders] = useState([]);
 
   useEffect(() => {
+    // Query: Sort by Tokens (High to Low)
     const q = query(
       collection(db, "users"),
       orderBy("tokens", "desc"),
@@ -14,10 +15,17 @@ export default function Leaderboard({ limit: limitCount = 10 }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const data = snapshot.docs.map((doc) => {
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          // Calculate games played safely
+          gamesPlayed: userData.completedGames ? userData.completedGames.length : 0,
+          // Fallback if no display name
+          displayName: userData.displayName || userData.email?.split('@')[0] || "Unknown"
+        };
+      });
       setLeaders(data);
     });
 
@@ -25,38 +33,57 @@ export default function Leaderboard({ limit: limitCount = 10 }) {
   }, [limitCount]);
 
   return (
-    <div className="w-full bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-black/50 text-gray-500 text-[10px] uppercase tracking-wider">
+    <div className="leaderboard-container">
+      <table className="leaderboard-table">
+        <thead>
           <tr>
-            <th className="p-4 font-normal">#</th>
-            <th className="p-4 font-normal">Player</th>
-            <th className="p-4 font-normal text-right">Tokens</th>
+            <th className="rank-col">#</th>
+            <th className="player-col">PLAYER</th>
+            <th className="games-col">GAMES</th>
+            <th className="tokens-col text-right">VISA</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800">
+        <tbody>
           {leaders.map((player, index) => (
-            <tr key={player.id} className="hover:bg-white/5 transition-colors">
-              <td className="p-4 text-gray-500 font-mono">
-                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
+            <tr key={player.id} className={index === 0 ? "top-rank" : ""}>
+              
+              {/* RANK */}
+              <td className="rank-col">
+                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}
               </td>
-              <td className="p-4">
-                <span className="text-white font-bold tracking-wide">
-                  {player.displayName || "Unknown Player"}
+              
+              {/* PLAYER NAME */}
+              <td className="player-col">
+                <span className="player-name">
+                  {player.displayName}
                 </span>
-                {player.role === 'admin' && (
-                  <span className="ml-2 px-1.5 py-0.5 rounded bg-red-900/50 text-red-400 text-[10px] border border-red-800">
-                    ADM
-                  </span>
+                {player.role === 'manager' && (
+                  <span className="badge-admin">MGR</span>
                 )}
               </td>
-              <td className="p-4 text-right">
-                <span className="text-yellow-500 font-mono font-bold drop-shadow-sm">
+
+              {/* GAMES PLAYED */}
+              <td className="games-col">
+                {player.gamesPlayed}
+              </td>
+
+              {/* TOKENS */}
+              <td className="tokens-col text-right">
+                <span className="token-value">
                   {player.tokens}
                 </span>
               </td>
             </tr>
           ))}
+          
+          {/* Empty State filler */}
+          {leaders.length === 0 && (
+             <tr>
+               <td colSpan="4" style={{textAlign:'center', padding:'20px', color:'#555'}}>
+                 SCANNING NETWORK...
+               </td>
+             </tr>
+          )}
         </tbody>
       </table>
     </div>
