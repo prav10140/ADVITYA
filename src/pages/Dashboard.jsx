@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [activeChaosRule, setActiveChaosRule] = useState("INITIALIZING...");
   const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
   
-  // TRACKING RULE CYCLES (To award points)
+  // TRACKING RULE CYCLES
   const lastCycleRef = useRef(null);
    
   // ACTIVE GAME TIMER STATE
@@ -63,32 +63,17 @@ export default function Dashboard() {
     return () => unsub();
   }, [currentUser]);
 
-  // --- 2. CHAOS TIMER & POINTS LOGIC ---
+  // --- 2. CHAOS TIMER LOGIC (POINTS REMOVED FROM HERE) ---
   useEffect(() => {
-    if (!currentUser?.uid) return;
-
     const syncChaosTimer = async () => {
         const now = Math.floor(Date.now() / 1000); 
-        
-        // Calculate which 10-minute "Block" we are in
         const currentCycleIndex = Math.floor(now / CHAOS_DURATION_SEC);
         
-        // 1. AWARD POINT IF CYCLE CHANGED (Rule Completed)
-        if (lastCycleRef.current !== null && currentCycleIndex > lastCycleRef.current) {
-            try {
-                const userRef = doc(db, "users", currentUser.uid);
-                await updateDoc(userRef, { 
-                    score: increment(1) // <--- +1 SCORE FOR SURVIVING RULE
-                });
-                addLog("RULE SURVIVED: +1 SCORE");
-            } catch (err) {
-                console.error("Error updating points:", err);
-            }
-        }
+        // We only update the visual rule and timer now. 
+        // Points are no longer awarded for just letting the chaos timer run.
         
         lastCycleRef.current = currentCycleIndex;
 
-        // 2. UPDATE TIMER & RULE DISPLAY
         const elapsedInCycle = now % CHAOS_DURATION_SEC;
         const remaining = CHAOS_DURATION_SEC - elapsedInCycle;
         const ruleIndex = currentCycleIndex % CHAOS_RULES.length;
@@ -100,7 +85,7 @@ export default function Dashboard() {
     syncChaosTimer();
     const timer = setInterval(syncChaosTimer, 1000);
     return () => clearInterval(timer);
-  }, [currentUser]); 
+  }, []); 
 
   // --- 3. GAME TIMER LOGIC ---
   useEffect(() => {
@@ -131,6 +116,7 @@ export default function Dashboard() {
     setSystemLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
   };
 
+  // AWARD POINT ONLY ON MISSION COMPLETION
   const handleTimeSuccess = async () => {
     if (!playerData?.activeGame) return;
     if (loadingDice) return; 
@@ -143,10 +129,10 @@ export default function Dashboard() {
         await updateDoc(userRef, {
             activeGame: null,
             completedGames: arrayUnion(completedGameId),
-            score: increment(1) // <--- +1 SCORE FOR FINISHING GAME
+            score: increment(1) // +1 POINT FOR COMPLETING THE MISSION TIME
         });
         
-        addLog(`SURVIVAL COMPLETE: +1 SCORE AWARDED`);
+        addLog(`MISSION SUCCESS: +1 SCORE AWARDED`);
         alert(`TIME UP. MISSION COMPLETE.\n\nReward: +1 Score`);
 
     } catch (err) {
@@ -185,12 +171,18 @@ export default function Dashboard() {
     }, 2000);
   };
 
+  // PENALTY: DEDUCT POINT FOR SKIPPING
   const skipChaosRule = async () => {
-    if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS."); return; }
+    if (playerData.score < 1) { 
+        alert("INSUFFICIENT SCORE TO SKIP."); 
+        return; 
+    }
     const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, { tokens: increment(-2) });
-    addLog(`CHAOS RULE SKIPPED (-2 TOKENS)`);
-    alert("RULE BYPASSED. IMMUNE FOR THIS PHASE.");
+    await updateDoc(userRef, { 
+        score: increment(-1) // CUTTING POINT FOR SKIPPING
+    });
+    addLog(`CHAOS RULE SKIPPED (-1 SCORE POINT)`);
+    alert("RULE BYPASSED. PENALTY: -1 SCORE POINT.");
   };
 
   const unlockCategory = async () => {
@@ -211,11 +203,7 @@ export default function Dashboard() {
 
   if (!playerData) return <div style={{background:'#000', color:'#0f0', height:'100vh', padding:'20px'}}>INITIALIZING CHAOS OS...</div>;
 
-  // --- SCORE CALCULATION FOR DISPLAY ---
-  const currentScore = Math.max(
-      playerData.score || 0, 
-      playerData.completedGames ? playerData.completedGames.length : 0
-  );
+  const currentScore = playerData.score || 0;
 
   return (
     <div className="chaos-room-shell">
@@ -230,7 +218,6 @@ export default function Dashboard() {
                 </button>
             )}
             
-            {/* DISPLAY TOTAL SCORE */}
             <div style={{color: '#00ff41', fontFamily: 'Orbitron', marginRight:'10px', fontSize:'1.2rem', textShadow:'0 0 10px #00ff41'}}>
                 SCORE: {currentScore}
             </div>
@@ -243,7 +230,7 @@ export default function Dashboard() {
       <div className="chaos-rule-strip">
         <div className="rule-display"><span className="rule-label">CURRENT RULE</span><span className="active-rule-text">{activeChaosRule}</span></div>
         <div className="rule-timer" style={{fontFamily:'monospace', fontSize:'1.2rem', color: chaosTimeLeft < 60 ? 'red' : '#0f0'}}>T-MINUS: {formatTime(chaosTimeLeft)}</div>
-        <button onClick={skipChaosRule} className="skip-btn">SKIP (-2 🪙)</button>
+        <button onClick={skipChaosRule} className="skip-btn">SKIP (-1 🏆)</button>
       </div>
 
       <div className="borderland-layer">
