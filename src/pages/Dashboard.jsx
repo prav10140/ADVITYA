@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { db, auth } from "../firebase";
@@ -37,165 +36,125 @@ export default function Dashboard() {
   // --- 1. INITIALIZATION ---
   useEffect(() => {
     if (!currentUser?.uid) return;
-
     const unsub = onSnapshot(doc(db, "users", currentUser.uid), (doc) => {
       const data = doc.data();
       setPlayerData(data);
-
-      // Only sync timer if activeGame exists in DB
       if (data?.activeGame?.startedAt) {
         const startTime = data.activeGame.startedAt.toDate().getTime();
         const now = Date.now();
-        const elapsedSec = Math.floor((now - startTime) / 1000);
-        const remaining = GAME_DURATION_SEC - elapsedSec;
+        const remaining = GAME_DURATION_SEC - Math.floor((now - startTime) / 1000);
         setGameTimeLeft(remaining > 0 ? remaining : 0);
       } else {
         setGameTimeLeft(null);
       }
     });
-
     return () => unsub();
   }, [currentUser]);
 
-  // --- 2. CHAOS RULE TIMER (VISUAL ONLY - NO FREE POINTS) ---
+  // --- 2. CHAOS RULE TIMER ---
   useEffect(() => {
     const syncChaosTimer = async () => {
         const now = Math.floor(Date.now() / 1000); 
         const currentCycleIndex = Math.floor(now / CHAOS_DURATION_SEC);
         lastCycleRef.current = currentCycleIndex;
-
-        const elapsedInCycle = now % CHAOS_DURATION_SEC;
-        setChaosTimeLeft(CHAOS_DURATION_SEC - elapsedInCycle);
+        setChaosTimeLeft(CHAOS_DURATION_SEC - (now % CHAOS_DURATION_SEC));
         setActiveChaosRule(CHAOS_RULES[currentCycleIndex % CHAOS_RULES.length]);
     };
-
     syncChaosTimer();
     const timer = setInterval(syncChaosTimer, 1000);
     return () => clearInterval(timer);
   }, []); 
 
-  // --- 3. MISSION TIMER LOGIC ---
+  // --- 3. MISSION TIMER ---
   useEffect(() => {
-    // Safety check: If timer is null, DO NOT run logic
     if (gameTimeLeft === null) return; 
-
-    if (gameTimeLeft <= 0) {
-        handleTimeSuccess();
-        return;
-    }
-
+    if (gameTimeLeft <= 0) { handleTimeSuccess(); return; }
     const gameTimer = setInterval(() => {
         setGameTimeLeft((prev) => {
-            // Safety: If it became null mid-interval (due to forfeit), stop.
             if (prev === null) return null;
-
-            if (prev <= 1) {
-                handleTimeSuccess();
-                return 0;
-            }
+            if (prev <= 1) { handleTimeSuccess(); return 0; }
             return prev - 1;
         });
     }, 1000);
-
     return () => clearInterval(gameTimer);
   }, [gameTimeLeft]);
 
   // --- ACTIONS ---
 
   const addLog = (msg) => {
-    const time = new Date().toLocaleTimeString();
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit" });
     setSystemLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
   };
 
   const handleTimeSuccess = async () => {
-    // CRITICAL: Double check activeGame exists before awarding points
     if (!playerData?.activeGame) return;
     if (loadingDice) return; 
     setLoadingDice(true);
-
     try {
         const userRef = doc(db, "users", currentUser.uid);
-        const completedGameId = playerData.activeGame.gameId;
-
         await updateDoc(userRef, {
             activeGame: null,
-            completedGames: arrayUnion(completedGameId),
-            score: increment(1) // +1 Only on Time Success
+            completedGames: arrayUnion(playerData.activeGame.gameId),
+            score: increment(1)
         });
-        
-        addLog(`MISSION SUCCESS: +1 SCORE AWARDED`);
+        addLog(`MISSION SUCCESS: +1 SCORE`);
         alert(`TIME UP. MISSION COMPLETE.`);
-
-    } catch (err) {
-        console.error("Auto-complete error:", err);
-    } finally {
-        setLoadingDice(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  // --- START GAME (MANUAL DICE) ---
+  // --- TOKEN DEDUCTION FOR SKIPPING RULE ---
+  const skipChaosRule = async () => {
+    if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS (TOKENS)."); return; }
+    await updateDoc(doc(db, "users", currentUser.uid), { tokens: increment(-2) });
+    addLog(`CHAOS RULE SKIPPED (-2 TOKENS)`);
+    alert("RULE SKIPPED. COST: 2 TOKENS.");
+  };
+
+  // --- TOKEN DEDUCTION FOR UNLOCKING CATEGORY ---
+  const unlockCategory = async () => {
+    if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS TO UNLOCK."); return; }
+    if(!window.confirm("Pay 2 Tokens to unlock this category?")) return;
+    
+    await updateDoc(doc(db, "users", currentUser.uid), { 
+        tokens: increment(-2), 
+        unlockedSameCategory: true 
+    });
+    addLog(`CATEGORY UNLOCKED (-2 TOKENS)`);
+  };
+
   const startMission = async (category, level) => {
-    const lastCategory = playerData.lastPlayedCategory;
-    if (lastCategory === category && !playerData.unlockedSameCategory) {
-        alert("PROTOCOL VIOLATION: Alternate categories or use Tokens.");
+    // If locked and not unlocked, block it (UI handles this, but double check)
+    if (playerData.lastPlayedCategory === category && !playerData.unlockedSameCategory) {
+        alert("LOCKED. UNLOCK FIRST.");
         return;
     }
-
     setLoadingDice(true);
     try {
       const gameId = `${category}_${level}`;
-      const userRef = doc(db, "users", currentUser.uid);
-      await updateDoc(userRef, {
+      await updateDoc(doc(db, "users", currentUser.uid), {
           activeGame: { category, level, gameId, startedAt: serverTimestamp() },
           lastPlayedCategory: category,
           unlockedSameCategory: false
       });
-      addLog(`ENTERING BORDERLAND: ${gameId}`);
+      addLog(`STARTED: ${gameId}`);
       setSelectedCategory(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingDice(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  // --- PENALTY: DEDUCT POINT FOR SKIPPING RULE ---
-  const skipChaosRule = async () => {
-    if (playerData.score < 1) { 
-        alert("INSUFFICIENT SCORE TO SKIP."); 
-        return; 
-    }
-    const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, { 
-        score: increment(-1) // CUTTING POINT (-1)
-    });
-    addLog(`CHAOS RULE SKIPPED (-1 SCORE POINT)`);
-    alert("RULE BYPASSED. PENALTY: -1 SCORE POINT.");
-  };
-
-  // --- FORFEIT GAME (FIXED: NO POINTS AWARDED) ---
   const quitGame = async () => {
-      if(!window.confirm("Give up? No rewards for quitters.")) return;
-      
-      // 1. KILL TIMER IMMEDIATELY (Fixes race condition bug)
-      setGameTimeLeft(null);
-      
-      // 2. OPTIMISTIC UPDATE (Stops handleTimeSuccess from firing)
-      setPlayerData(prev => ({...prev, activeGame: null}));
-
-      // 3. DATABASE UPDATE (Clear game, NO Score Increment)
-      const userRef = doc(db, "users", currentUser.uid);
-      await updateDoc(userRef, { activeGame: null });
-      
-      addLog(`MISSION ABORTED (0 POINTS)`);
+      if(!window.confirm("Forfeit? No points will be awarded.")) return;
+      setGameTimeLeft(null); // Kill timer immediately
+      await updateDoc(doc(db, "users", currentUser.uid), { activeGame: null });
+      addLog(`MISSION FORFEITED`);
   }
 
   const handleLogout = async () => { await signOut(auth); navigate("/"); };
 
-  if (!playerData) return <div className="loading-screen">INITIALIZING ADVITYA OS...</div>;
+  if (!playerData) return <div className="loading-screen">INITIALIZING...</div>;
 
-  // STRICT SCORE DISPLAY (Shows negatives if they skip too much)
   const currentScore = playerData.score || 0;
+  const isHeartLocked = playerData.lastPlayedCategory === "HEART" && !playerData.unlockedSameCategory;
+  const isSpadeLocked = playerData.lastPlayedCategory === "SPADE" && !playerData.unlockedSameCategory;
 
   return (
     <div className="chaos-room-shell">
@@ -205,29 +164,30 @@ export default function Dashboard() {
         </div>
         <div className="header-stats">
             {(playerData.role === 'admin' || playerData.role === 'manager') && (
-                <button onClick={() => navigate('/admin')} className="manager-panel-btn">MANAGER PANEL</button>
+                <button onClick={() => navigate('/admin')} className="manager-btn">MANAGER PANEL</button>
             )}
-            <div className="stat-box">SCORE: {currentScore}</div>
+            <div className="stat-box">SCORE: <span className="neon-green">{currentScore}</span></div>
             <div className="stat-box">ID: {currentUser.email.split('@')[0]}</div>
-            <div className="stat-box">TOKENS: <span className="token-text">{playerData.tokens}</span></div>
+            <div className="stat-box">TOKENS: <span className="neon-gold">{playerData.tokens}</span></div>
             <button onClick={handleLogout} className="exit-btn">EXIT</button>
         </div>
       </header>
 
       <div className="chaos-rule-strip">
         <div className="rule-info">
-            <span className="current-rule-label">CURRENT RULE</span>
+            <span className="rule-label">CURRENT RULE</span>
             <span className="rule-name">{activeChaosRule}</span>
         </div>
-        <div className="rule-timer-container">
+        <div className="rule-actions">
             <span className="timer-text">T-MINUS: {formatTime(chaosTimeLeft)}</span>
-            <button onClick={skipChaosRule} className="skip-btn">SKIP (-1 🏆)</button>
+            <button onClick={skipChaosRule} className="skip-btn">SKIP (-2 🪙)</button>
         </div>
       </div>
 
       <div className="borderland-layer">
         <div className="game-console">
             
+            {/* GAME PANEL */}
             <div className="gateway-panel">
                 <h2 className="panel-title">BORDERLAND PROTOCOL</h2>
                 
@@ -235,59 +195,91 @@ export default function Dashboard() {
                     <div className="active-mission-screen">
                           <div className="game-countdown">{formatTime(gameTimeLeft)}</div>
                           <h1 className="mission-title">{playerData.activeGame.gameId}</h1>
-                          <h2 className="game-name" style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff'}}>
-                             {GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN MISSION"}
-                          </h2>
+                          <h2 className="game-name">{GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}</h2>
+                          <p className="game-desc">{GAME_DATABASE[playerData.activeGame.gameId]?.description}</p>
                           <div className="loc-display">LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}</div>
-                          <button onClick={quitGame} className="forfeit-btn">FORFEIT MISSION</button>
+                          <button onClick={quitGame} className="forfeit-btn">FORFEIT</button>
                     </div>
                 ) : (
                     <div className="cards-wrapper">
-                        {['HEART', 'SPADE'].map(cat => (
-                           <div key={cat} className="suit-container">
-                              {selectedCategory === cat ? (
-                                 <div className="level-grid-overlay">
-                                    <p className="dice-instruction">INPUT PHYSICAL DICE RESULT</p>
-                                    <div className="dice-numbers">
-                                        {[1,2,3,4,5,6].map(num => (
-                                           <button key={num} onClick={() => startMission(cat, num)} className="dice-btn">{num}</button>
-                                        ))}
+                        {/* HEART CARD */}
+                        <div className="suit-container">
+                            {selectedCategory === 'HEART' ? (
+                                <div className="level-grid">
+                                    <p>SELECT DICE ROLL</p>
+                                    <div className="dice-row">
+                                        {[1,2,3,4,5,6].map(n => <button key={n} onClick={() => startMission('HEART', n)} className="dice-btn">{n}</button>)}
                                     </div>
                                     <button onClick={() => setSelectedCategory(null)} className="back-btn">CANCEL</button>
-                                 </div>
-                              ) : (
-                                 <button className={`suit-card ${cat.toLowerCase()}`} onClick={() => setSelectedCategory(cat)} disabled={loadingDice}>
-                                    <div className="suit-symbol" style={{color: cat === 'HEART' ? '#ff0055' : '#00ccff'}}>{cat === 'HEART' ? '♥' : '♠'}</div>
-                                    <span className="suit-label">{cat}</span>
-                                    {playerData.lastPlayedCategory === cat && !playerData.unlockedSameCategory && <div className="lock-tag">LOCKED</div>}
-                                 </button>
-                              )}
-                           </div>
-                        ))}
+                                </div>
+                            ) : (
+                                <div className="card-wrapper">
+                                    <button className="suit-card heart-card" onClick={() => setSelectedCategory('HEART')} disabled={isHeartLocked}>
+                                        <div className="suit-icon">♥</div>
+                                        <div className="suit-name">HEART</div>
+                                        <div className="suit-type">SOCIAL / EMOTIONAL</div>
+                                    </button>
+                                    {isHeartLocked && (
+                                        <div className="locked-overlay">
+                                            <div className="lock-icon">🔒</div>
+                                            <button onClick={unlockCategory} className="unlock-btn">UNLOCK (-2 🪙)</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SPADE CARD */}
+                        <div className="suit-container">
+                            {selectedCategory === 'SPADE' ? (
+                                <div className="level-grid">
+                                    <p>SELECT DICE ROLL</p>
+                                    <div className="dice-row">
+                                        {[1,2,3,4,5,6].map(n => <button key={n} onClick={() => startMission('SPADE', n)} className="dice-btn">{n}</button>)}
+                                    </div>
+                                    <button onClick={() => setSelectedCategory(null)} className="back-btn">CANCEL</button>
+                                </div>
+                            ) : (
+                                <div className="card-wrapper">
+                                    <button className="suit-card spade-card" onClick={() => setSelectedCategory('SPADE')} disabled={isSpadeLocked}>
+                                        <div className="suit-icon">♠</div>
+                                        <div className="suit-name">SPADE</div>
+                                        <div className="suit-type">LOGIC / INTELLECT</div>
+                                    </button>
+                                    {isSpadeLocked && (
+                                        <div className="locked-overlay">
+                                            <div className="lock-icon">🔒</div>
+                                            <button onClick={unlockCategory} className="unlock-btn">UNLOCK (-2 🪙)</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
             
+            {/* SIDEBAR */}
             <div className="data-sidebar">
-                <div className="sidebar-box ranking-box">
-                   <div className="sidebar-header">LIVE RANKINGS <span className="blink">● LIVE</span></div>
+                <div className="sidebar-box">
+                   <div className="box-header">LIVE RANKINGS <span className="blink">●</span></div>
                    <Leaderboard limitCount={10} />
                 </div>
 
-                <div className="sidebar-box history-box">
-                   <div className="sidebar-header">MISSION HISTORY</div>
+                <div className="sidebar-box">
+                   <div className="box-header">MISSION HISTORY</div>
                    <div className="history-content">
-                      <div className="history-item">
-                         <span className="icon-pink">♥</span>: {playerData.completedGames?.filter(g => g.startsWith('HEART')).map(g => g.split('_')[1]).join(', ') || 'None'}
+                      <div className="history-row">
+                         <span style={{color:'#ff0055', fontWeight:'bold'}}>♥</span>: {playerData.completedGames?.filter(g => g.startsWith('HEART')).map(g => g.split('_')[1]).join(', ') || '-'}
                       </div>
-                      <div className="history-item">
-                         <span className="icon-blue">♠</span>: {playerData.completedGames?.filter(g => g.startsWith('SPADE')).map(g => g.split('_')[1]).join(', ') || 'None'}
+                      <div className="history-row">
+                         <span style={{color:'#00ccff', fontWeight:'bold'}}>♠</span>: {playerData.completedGames?.filter(g => g.startsWith('SPADE')).map(g => g.split('_')[1]).join(', ') || '-'}
                       </div>
                    </div>
                 </div>
 
-                <div className="sidebar-box logs-box">
-                    <div className="sidebar-header">SYSTEM LOGS</div>
+                <div className="sidebar-box">
+                    <div className="box-header">SYSTEM LOGS</div>
                     <div className="logs-container">
                         {systemLogs.map((log, i) => <div key={i} className="log-line">{log}</div>)}
                     </div>
@@ -295,11 +287,6 @@ export default function Dashboard() {
             </div>
         </div>
       </div>
-      <footer className="chaos-footer">
-        <div className="ticker-text">
-            WARNING: VISA EXPIRY IMMINENT // CURRENT RULE: {activeChaosRule} // PENALTY FOR FAILURE: INCREMENTAL // TRUST NO ONE // 
-        </div>
-      </footer>
     </div>
   );
 }
