@@ -1,83 +1,86 @@
-/* src/pages/AdminPanel.css */
-.admin-container {
+.admin-shell {
   min-height: 100vh;
-  background-color: #050505;
-  color: #fff;
-  padding: 20px;
+  background: #000;
+  color: #00ff41;
   font-family: 'Share Tech Mono', monospace;
+  padding: 20px;
 }
 
 .admin-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #333;
+  border-bottom: 2px solid #ff0055;
   padding-bottom: 20px;
+  margin-bottom: 30px;
 }
 
-.admin-title {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2rem;
-  color: #ff0055;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
-}
+.admin-header h1 { margin: 0; font-family: 'Orbitron'; letter-spacing: 2px; }
 
-.admin-table-wrapper {
-  overflow-x: auto;
-  border: 1px solid #333;
-  border-radius: 8px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+.back-btn {
+  background: #333;
+  color: #fff;
+  border: 1px solid #fff;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: 'Orbitron';
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  background: rgba(20,20,20,0.8);
 }
 
-.admin-table thead {
-  background-color: #111;
-  color: #888;
-  text-transform: uppercase;
-}
-
-.admin-table th, .admin-table td {
-  padding: 15px;
+.admin-table th {
   text-align: left;
+  padding: 15px;
+  background: #111;
+  color: #888;
+  font-family: 'Orbitron';
+  border-bottom: 1px solid #333;
+}
+
+.admin-table td {
+  padding: 15px;
   border-bottom: 1px solid #222;
 }
 
-.admin-table tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
+.row-active { background: rgba(0, 255, 65, 0.05); }
 
-/* Badges */
-.badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; text-transform: uppercase; }
-.badge-admin { background: #ff0055; color: #fff; }
-.badge-manager { background: #ffd700; color: #000; }
-.badge-user { background: #333; color: #ccc; }
+/* COLUMNS */
+.id-col { font-size: 1.1rem; font-weight: bold; }
+.score-sub { font-size: 0.8rem; color: #666; margin-top: 5px; }
+.tag-mgr { background: #ff0055; color: #fff; padding: 2px 5px; font-size: 0.6rem; margin-left: 5px; }
 
-/* Buttons */
-.action-btn {
+.status-live { color: #00ff41; text-shadow: 0 0 5px #00ff41; animation: blink 1s infinite; }
+.status-idle { color: #444; }
+
+.mission-info { display: flex; flex-direction: column; gap: 2px; }
+.m-id { color: #fff; font-weight: bold; }
+.m-cat { font-size: 0.8rem; color: #00ccff; }
+.m-lvl { font-size: 0.8rem; color: #ffd700; }
+
+.action-buttons { display: flex; gap: 10px; }
+.btn-verify {
+  background: #00ff41;
+  color: #000;
   border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
+  padding: 8px 15px;
+  cursor: pointer;
   font-weight: bold;
-  cursor: pointer;
-  margin-right: 5px;
-  font-family: monospace;
 }
-.btn-plus { background: #00ccff; color: #000; }
-.btn-minus { background: #ff0055; color: #fff; }
-.btn-reset { background: #ffd700; color: #000; }
+.btn-verify:hover { box-shadow: 0 0 15px #00ff41; }
 
-.btn-back {
+.btn-cancel {
   background: transparent;
-  border: 1px solid #fff;
-  color: #fff;
-  padding: 5px 15px;
+  border: 1px solid #ff0055;
+  color: #ff0055;
+  padding: 8px 15px;
   cursor: pointer;
 }
-.btn-back:hover { background: #fff; color: #000; }
+
+.token-btns { display: flex; gap: 5px; margin-top: 5px; }
+.t-btn { background: #333; border: 1px solid #555; color: #fff; width: 20px; height: 20px; cursor: pointer; }
+
+@keyframes blink { 50% { opacity: 0.5; } }
