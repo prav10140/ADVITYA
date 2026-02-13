@@ -1,21 +1,35 @@
+/* src/pages/AdminPanel.css */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
 .admin-shell {
-  min-height: 100vh;
+  height: 100vh; /* Force full viewport height */
+  width: 100vw;
   background: #000;
   color: #00ff41;
   font-family: 'Share Tech Mono', monospace;
-  padding: 20px;
+  display: flex;       /* Use Flexbox */
+  flex-direction: column;
+  overflow: hidden;    /* Prevent body scroll, handle inside content */
 }
 
+/* --- HEADER (FIXED AT TOP) --- */
 .admin-header {
+  flex-shrink: 0; /* Prevent header from shrinking */
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 2px solid #ff0055;
-  padding-bottom: 20px;
-  margin-bottom: 30px;
+  padding: 20px 30px;
+  background: #050505;
+  z-index: 10;
 }
 
-.admin-header h1 { margin: 0; font-family: 'Orbitron'; letter-spacing: 2px; }
+.admin-header h1 { 
+  margin: 0; 
+  font-family: 'Orbitron'; 
+  letter-spacing: 2px; 
+  font-size: 1.5rem;
+}
 
 .back-btn {
   background: #333;
@@ -26,42 +40,71 @@
   font-family: 'Orbitron';
 }
 
+/* --- SCROLLABLE CONTENT AREA --- */
+.admin-content {
+  flex: 1;             /* Takes all remaining height */
+  overflow-y: auto;    /* ENABLE SCROLLING HERE */
+  padding: 20px;
+  padding-bottom: 100px; /* Extra space at bottom so last user isn't cut off */
+}
+
+/* --- TABLE STYLES --- */
 .admin-table {
   width: 100%;
   border-collapse: collapse;
   background: rgba(20,20,20,0.8);
+  border: 1px solid #333;
+}
+
+.admin-table thead {
+  position: sticky; /* Keep header visible while scrolling */
+  top: 0;
+  z-index: 5;
+  background: #111;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
 }
 
 .admin-table th {
   text-align: left;
   padding: 15px;
-  background: #111;
   color: #888;
   font-family: 'Orbitron';
-  border-bottom: 1px solid #333;
+  border-bottom: 2px solid #333;
+  font-size: 0.9rem;
 }
 
 .admin-table td {
   padding: 15px;
   border-bottom: 1px solid #222;
+  vertical-align: middle;
 }
 
-.row-active { background: rgba(0, 255, 65, 0.05); }
+/* --- ROWS & STATUS --- */
+.row-active { 
+  background: rgba(0, 255, 65, 0.05); 
+  border-left: 3px solid #00ff41;
+}
 
-/* COLUMNS */
-.id-col { font-size: 1.1rem; font-weight: bold; }
+.id-col { font-size: 1.1rem; font-weight: bold; color: #fff; }
 .score-sub { font-size: 0.8rem; color: #666; margin-top: 5px; }
-.tag-mgr { background: #ff0055; color: #fff; padding: 2px 5px; font-size: 0.6rem; margin-left: 5px; }
+.tag-mgr { background: #ff0055; color: #fff; padding: 2px 5px; font-size: 0.6rem; margin-left: 5px; border-radius: 2px; }
 
-.status-live { color: #00ff41; text-shadow: 0 0 5px #00ff41; animation: blink 1s infinite; }
+.status-live { 
+  color: #00ff41; 
+  text-shadow: 0 0 5px #00ff41; 
+  animation: blink 1s infinite; 
+  font-weight: bold;
+}
 .status-idle { color: #444; }
 
-.mission-info { display: flex; flex-direction: column; gap: 2px; }
-.m-id { color: #fff; font-weight: bold; }
+.mission-info { display: flex; flex-direction: column; gap: 4px; }
+.m-id { color: #fff; font-weight: bold; font-size: 1rem; }
 .m-cat { font-size: 0.8rem; color: #00ccff; }
 .m-lvl { font-size: 0.8rem; color: #ffd700; }
 
+/* --- BUTTONS --- */
 .action-buttons { display: flex; gap: 10px; }
+
 .btn-verify {
   background: #00ff41;
   color: #000;
@@ -69,8 +112,14 @@
   padding: 8px 15px;
   cursor: pointer;
   font-weight: bold;
+  font-family: 'Orbitron';
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+  transition: 0.2s;
 }
-.btn-verify:hover { box-shadow: 0 0 15px #00ff41; }
+.btn-verify:hover { 
+  transform: scale(1.05); 
+  box-shadow: 0 0 20px #00ff41; 
+}
 
 .btn-cancel {
   background: transparent;
@@ -78,9 +127,31 @@
   color: #ff0055;
   padding: 8px 15px;
   cursor: pointer;
+  font-family: 'Orbitron';
+  font-size: 0.8rem;
 }
+.btn-cancel:hover { background: rgba(255, 0, 85, 0.1); }
 
+/* --- TOKENS --- */
+.tokens-col { font-size: 1.1rem; color: #ffd700; }
 .token-btns { display: flex; gap: 5px; margin-top: 5px; }
-.t-btn { background: #333; border: 1px solid #555; color: #fff; width: 20px; height: 20px; cursor: pointer; }
+.t-btn { 
+  background: #333; 
+  border: 1px solid #555; 
+  color: #fff; 
+  width: 25px; 
+  height: 25px; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+}
+.t-btn:hover { border-color: #fff; background: #444; }
 
 @keyframes blink { 50% { opacity: 0.5; } }
+
+/* CUSTOM SCROLLBAR FOR ADMIN LIST */
+.admin-content::-webkit-scrollbar { width: 8px; }
+.admin-content::-webkit-scrollbar-track { background: #111; }
+.admin-content::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+.admin-content::-webkit-scrollbar-thumb:hover { background: #555; }
