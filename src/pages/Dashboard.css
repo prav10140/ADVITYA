@@ -15,7 +15,7 @@ body {
   background-color: var(--bg-dark);
   color: var(--neon-green);
   font-family: 'Share Tech Mono', monospace;
-  overflow: hidden;
+  overflow: hidden; /* Keep body hidden to prevent double scrollbars */
 }
 
 /* --- MAIN SHELL --- */
@@ -41,6 +41,7 @@ body {
 
 /* --- HEADER --- */
 .chaos-header {
+  flex-shrink: 0; /* Prevent header from shrinking */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -78,6 +79,7 @@ body {
 
 /* --- RULE STRIP --- */
 .chaos-rule-strip {
+  flex-shrink: 0; /* Prevent rule strip from shrinking */
   background: #000;
   border-bottom: 2px solid var(--neon-red);
   padding: 12px 30px;
@@ -110,7 +112,14 @@ body {
 }
 
 /* --- LAYOUT GRID --- */
-.borderland-layer { flex: 1; padding: 20px; display: flex; justify-content: center; overflow: hidden; }
+.borderland-layer { 
+  flex: 1; 
+  padding: 20px; 
+  display: flex; 
+  justify-content: center; 
+  overflow: hidden; /* Ensure only content inside scrolls if needed */
+  min-height: 0; /* Crucial for flex containers to scroll properly */
+}
 
 .game-console {
   display: grid;
@@ -128,6 +137,7 @@ body {
   padding: 20px;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Prevent spillover */
 }
 
 .panel-title {
@@ -137,24 +147,27 @@ body {
   border-bottom: 1px solid #333;
   padding-bottom: 10px;
   margin-top: 0;
+  flex-shrink: 0;
 }
 
 /* --- CARD WRAPPER & SIZING FIX --- */
 .cards-wrapper {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center; /* Center cards horizontally */
+  align-items: center; /* Vertically center */
+  justify-content: center; /* Horizontally center */
   gap: 30px;
-  padding: 20px;
+  padding: 10px; /* Reduced padding */
+  overflow-y: auto; /* Allow scrolling if screen is too short */
 }
 
-/* Makes the container hold the card shape */
 .suit-container {
   flex: 1;
-  max-width: 350px; /* Limits width so they don't get absurdly wide */
-  min-width: 250px; /* Ensures they don't get too small */
-  aspect-ratio: 3/4; /* Maintains standard poker card proportions */
+  max-width: 350px; 
+  min-width: 250px;
+  /* CHANGED: Removed fixed aspect ratio that was pushing them down */
+  height: 80%; /* Takes up 80% of the available panel height */
+  max-height: 500px; /* Don't get taller than this */
   position: relative;
 }
 
@@ -235,12 +248,19 @@ body {
 .back-btn { background: transparent; border: none; color: #666; text-decoration: underline; cursor: pointer; margin-top: 10px; }
 
 /* --- RIGHT SIDEBAR --- */
-.data-sidebar { display: flex; flex-direction: column; gap: 20px; }
+.data-sidebar { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 20px; 
+    height: 100%; 
+    overflow-y: auto; /* Allow sidebar to scroll if needed */
+}
 
 .sidebar-box {
   background: #000;
   border: 1px solid #222;
   padding: 15px;
+  flex-shrink: 0;
 }
 
 .box-header {
@@ -278,3 +298,15 @@ body {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: #000; }
 ::-webkit-scrollbar-thumb { background: #333; }
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 1000px) {
+  .game-console { 
+      grid-template-columns: 1fr; 
+      overflow-y: auto; 
+      display: flex;
+      flex-direction: column;
+  }
+  .cards-wrapper { flex-direction: column; height: auto; gap: 20px; padding-bottom: 50px; }
+  .suit-container { width: 100%; height: 200px; }
+}
