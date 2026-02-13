@@ -7,17 +7,13 @@ export default function Leaderboard({ limitCount = 10 }) {
   const [leaders, setLeaders] = useState([]);
 
   useEffect(() => {
-    // Query all users to determine rankings
     const q = query(collection(db, "users"), limit(50));
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => {
         const userData = doc.data();
         
-        // --- SCORE LOGIC UPDATED ---
-        // We now use the 'score' field directly so that point deductions 
-        // from skipping rules are reflected in the live rankings.
-        const currentScore = userData.score || 0;
+        // STRICT SCORE: Allows negative numbers if they skip rules too much
+        const currentScore = userData.score || 0; 
 
         return {
           id: doc.id,
@@ -27,9 +23,8 @@ export default function Leaderboard({ limitCount = 10 }) {
         };
       });
 
-      // SORT BY SCORE (Highest to Lowest)
+      // Sort High to Low
       data.sort((a, b) => b.displayScore - a.displayScore);
-
       setLeaders(data.slice(0, limitCount));
     });
     return unsubscribe;
@@ -49,33 +44,13 @@ export default function Leaderboard({ limitCount = 10 }) {
         <tbody>
           {leaders.map((player, index) => (
             <tr key={player.id} className={index === 0 ? "top-rank" : ""}>
-              
-              {/* RANK DISPLAY WITH EMOJIS FOR TOP 3 */}
-              <td className="rank-col">
-                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}
-              </td>
-              
-              {/* PLAYER IDENTITY */}
+              <td className="rank-col">{index === 0 ? "🥇" : index + 1}</td>
               <td className="player-col">
-                <span className="player-name">
-                  {player.displayName}
-                </span>
-                {player.role === 'manager' && (
-                  <span className="badge-admin" style={{ marginLeft: '8px', fontSize: '0.6rem', color: '#ff0055', border: '1px solid #ff0055', padding: '1px 4px' }}>MGR</span>
-                )}
+                <span className="player-name">{player.displayName}</span>
+                {player.role === 'manager' && <span className="badge-admin" style={{color:'#ff0055', border:'1px solid #ff0055', fontSize:'0.6rem', marginLeft:'5px', padding:'0 3px'}}>MGR</span>}
               </td>
-
-              {/* LIVE SCORE (Affected by completions and skips) */}
-              <td className="games-col" style={{color:'#00ff41', fontWeight:'bold', fontSize:'1.1rem'}}>
-                {player.displayScore}
-              </td>
-
-              {/* TOKEN/VISA BALANCE */}
-              <td className="tokens-col text-right">
-                <span className="token-value" style={{ color: '#ffd700' }}>
-                  {player.tokens}
-                </span>
-              </td>
+              <td className="games-col" style={{color: player.displayScore < 0 ? 'red' : '#00ff41', fontWeight:'bold'}}>{player.displayScore}</td>
+              <td className="tokens-col text-right"><span style={{color:'#ffd700'}}>{player.tokens}</span></td>
             </tr>
           ))}
         </tbody>
