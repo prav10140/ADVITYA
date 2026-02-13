@@ -5,11 +5,10 @@ import { useAuth } from "../context/AuthContext";
 export default function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
 
-  // If no user is logged in, redirect them to the Login page
+  // CHANGE: Redirect to /login instead of /
   if (!currentUser) {
-    return <Navigate to="/" />;
+    return <Navigate to="/login" />;
   }
 
-  // If user is logged in, show the protected page (Dashboard/Admin)
   return children;
 }
