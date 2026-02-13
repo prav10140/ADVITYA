@@ -9,9 +9,8 @@ import { GAME_DATABASE } from "../gameConfig";
 import Leaderboard from "../components/Leaderboard"; 
 import "./Dashboard.css"; 
 
-// --- CONFIGURATION ---
-const CHAOS_DURATION_SEC = 600; // 10 Minutes per Rule
-const GAME_DURATION_SEC = 600;  // 10 Minutes per Mission
+const CHAOS_DURATION_SEC = 600; 
+const GAME_DURATION_SEC = 600;  
 const CHAOS_RULES = ["FLOOR IS LAVA", "SIT-STAND", "COMPLETE SILENCE", "SLOW MOTION", "ONE HAND ONLY"];
 
 export default function Dashboard() {
@@ -19,21 +18,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [playerData, setPlayerData] = useState(null);
   const [loadingDice, setLoadingDice] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null); // Tracking click for level selection
    
-  // LAYER 1: CHAOS ROOM STATE
   const [activeChaosRule, setActiveChaosRule] = useState("INITIALIZING...");
   const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
-  
-  // TRACKING RULE CYCLES (To award points)
   const lastCycleRef = useRef(null);
-   
-  // ACTIVE GAME TIMER STATE
   const [gameTimeLeft, setGameTimeLeft] = useState(null);
-   
-  // LOGS
   const [systemLogs, setSystemLogs] = useState([]);
 
-  // --- HELPER: FORMAT TIME (MM:SS) ---
   const formatTime = (seconds) => {
     if (seconds < 0) return "00:00";
     const m = Math.floor(seconds / 60);
@@ -41,14 +33,11 @@ export default function Dashboard() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // --- 1. INITIALIZATION & DATA SYNC ---
   useEffect(() => {
     if (!currentUser?.uid) return;
-
     const unsub = onSnapshot(doc(db, "users", currentUser.uid), (doc) => {
       const data = doc.data();
       setPlayerData(data);
-
       if (data?.activeGame?.startedAt) {
         const startTime = data.activeGame.startedAt.toDate().getTime();
         const now = Date.now();
@@ -59,72 +48,43 @@ export default function Dashboard() {
         setGameTimeLeft(null);
       }
     });
-
     return () => unsub();
   }, [currentUser]);
 
-  // --- 2. CHAOS TIMER & POINTS LOGIC ---
   useEffect(() => {
     if (!currentUser?.uid) return;
-
     const syncChaosTimer = async () => {
         const now = Math.floor(Date.now() / 1000); 
-        
-        // Calculate which 10-minute "Block" we are in
         const currentCycleIndex = Math.floor(now / CHAOS_DURATION_SEC);
-        
-        // 1. AWARD POINT IF CYCLE CHANGED (Rule Completed)
         if (lastCycleRef.current !== null && currentCycleIndex > lastCycleRef.current) {
             try {
                 const userRef = doc(db, "users", currentUser.uid);
-                await updateDoc(userRef, { 
-                    score: increment(1) // <--- +1 SCORE FOR SURVIVING RULE
-                });
+                await updateDoc(userRef, { score: increment(1) });
                 addLog("RULE SURVIVED: +1 SCORE");
-            } catch (err) {
-                console.error("Error updating points:", err);
-            }
+            } catch (err) { console.error(err); }
         }
-        
         lastCycleRef.current = currentCycleIndex;
-
-        // 2. UPDATE TIMER & RULE DISPLAY
         const elapsedInCycle = now % CHAOS_DURATION_SEC;
         const remaining = CHAOS_DURATION_SEC - elapsedInCycle;
-        const ruleIndex = currentCycleIndex % CHAOS_RULES.length;
-        
         setChaosTimeLeft(remaining);
-        setActiveChaosRule(CHAOS_RULES[ruleIndex]);
+        setActiveChaosRule(CHAOS_RULES[currentCycleIndex % CHAOS_RULES.length]);
     };
-
     syncChaosTimer();
     const timer = setInterval(syncChaosTimer, 1000);
     return () => clearInterval(timer);
   }, [currentUser]); 
 
-  // --- 3. GAME TIMER LOGIC ---
   useEffect(() => {
     if (gameTimeLeft === null) return; 
-
-    if (gameTimeLeft <= 0) {
-        handleTimeSuccess();
-        return;
-    }
-
+    if (gameTimeLeft <= 0) { handleTimeSuccess(); return; }
     const gameTimer = setInterval(() => {
         setGameTimeLeft((prev) => {
-            if (prev <= 1) {
-                handleTimeSuccess();
-                return 0;
-            }
+            if (prev <= 1) { handleTimeSuccess(); return 0; }
             return prev - 1;
         });
     }, 1000);
-
     return () => clearInterval(gameTimer);
   }, [gameTimeLeft]);
-
-  // --- ACTIONS ---
 
   const addLog = (msg) => {
     const time = new Date().toLocaleTimeString();
@@ -135,69 +95,38 @@ export default function Dashboard() {
     if (!playerData?.activeGame) return;
     if (loadingDice) return; 
     setLoadingDice(true);
-
     try {
         const userRef = doc(db, "users", currentUser.uid);
         const completedGameId = playerData.activeGame.gameId;
-
         await updateDoc(userRef, {
             activeGame: null,
             completedGames: arrayUnion(completedGameId),
-            score: increment(1) // <--- +1 SCORE FOR FINISHING GAME
+            score: increment(1)
         });
-        
-        addLog(`SURVIVAL COMPLETE: +1 SCORE AWARDED`);
-        alert(`TIME UP. MISSION COMPLETE.\n\nReward: +1 Score`);
-
-    } catch (err) {
-        console.error("Auto-complete error:", err);
-    } finally {
-        setLoadingDice(false);
-    }
+        addLog(`SURVIVAL COMPLETE: ${completedGameId}`);
+        alert(`TIME UP. MISSION COMPLETE.`);
+    } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  const rollDice = async (category) => {
+  // Start mission based on Manual Level Selection
+  const startMission = async (category, level) => {
     const lastCategory = playerData.lastPlayedCategory;
     if (lastCategory === category && !playerData.unlockedSameCategory) {
-        alert("PROTOCOL VIOLATION: You must alternate categories. Pay 2 tokens to bypass.");
+        alert("PROTOCOL VIOLATION: Alternate categories or pay 2 tokens.");
         return;
     }
     setLoadingDice(true);
-    setTimeout(async () => {
-      try {
-        const level = Math.floor(Math.random() * 6) + 1;
-        const gameId = `${category}_${level}`;
-        const userRef = doc(db, "users", currentUser.uid);
-        await updateDoc(userRef, {
-            activeGame: {
-                category, level, gameId,
-                startedAt: serverTimestamp()
-            },
-            lastPlayedCategory: category,
-            unlockedSameCategory: false
-        });
-        addLog(`ENTERING BORDERLAND: ${category} LEVEL ${level}`);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingDice(false);
-      }
-    }, 2000);
-  };
-
-  const skipChaosRule = async () => {
-    if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS."); return; }
-    const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, { tokens: increment(-2) });
-    addLog(`CHAOS RULE SKIPPED (-2 TOKENS)`);
-    alert("RULE BYPASSED. IMMUNE FOR THIS PHASE.");
-  };
-
-  const unlockCategory = async () => {
-    if (playerData.tokens < 2) return alert("INSUFFICIENT VISAS.");
-    const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, { tokens: increment(-2), unlockedSameCategory: true });
-    addLog(`CATEGORY LOCK OVERRIDDEN (-2 TOKENS)`);
+    try {
+      const gameId = `${category}_${level}`;
+      const userRef = doc(db, "users", currentUser.uid);
+      await updateDoc(userRef, {
+          activeGame: { category, level, gameId, startedAt: serverTimestamp() },
+          lastPlayedCategory: category,
+          unlockedSameCategory: false
+      });
+      addLog(`ENTERING BORDERLAND: ${gameId}`);
+      setSelectedCategory(null);
+    } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
   const quitGame = async () => {
@@ -209,13 +138,9 @@ export default function Dashboard() {
 
   const handleLogout = async () => { await signOut(auth); navigate("/"); };
 
-  if (!playerData) return <div style={{background:'#000', color:'#0f0', height:'100vh', padding:'20px'}}>INITIALIZING CHAOS OS...</div>;
+  if (!playerData) return <div style={{background:'#000', color:'#0f0', height:'100vh', padding:'20px'}}>INITIALIZING...</div>;
 
-  // --- SCORE CALCULATION FOR DISPLAY ---
-  const currentScore = Math.max(
-      playerData.score || 0, 
-      playerData.completedGames ? playerData.completedGames.length : 0
-  );
+  const currentScore = Math.max(playerData.score || 0, playerData.completedGames ? playerData.completedGames.length : 0);
 
   return (
     <div className="chaos-room-shell">
@@ -225,16 +150,9 @@ export default function Dashboard() {
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'20px'}}>
             {(playerData.role === 'admin' || playerData.role === 'manager') && (
-                <button onClick={() => navigate('/admin')} style={{background: '#ff0055', color: '#fff', border: 'none', padding: '5px 15px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Orbitron', fontSize: '0.8rem', boxShadow: '0 0 10px #ff0055'}}>
-                    MANAGER PANEL
-                </button>
+                <button onClick={() => navigate('/admin')} style={{background: '#ff0055', color: '#fff', border: 'none', padding: '5px 15px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Orbitron', fontSize: '0.8rem', boxShadow: '0 0 10px #ff0055'}}>MANAGER PANEL</button>
             )}
-            
-            {/* DISPLAY TOTAL SCORE */}
-            <div style={{color: '#00ff41', fontFamily: 'Orbitron', marginRight:'10px', fontSize:'1.2rem', textShadow:'0 0 10px #00ff41'}}>
-                SCORE: {currentScore}
-            </div>
-
+            <div style={{color: '#00ff41', fontFamily: 'Orbitron', fontSize:'1.2rem'}}>SCORE: {currentScore}</div>
             <div className="user-id">ID: {currentUser.email.split('@')[0]} | TOKENS: <span style={{color: '#ffd700'}}>{playerData.tokens}</span></div>
             <button onClick={handleLogout} style={{background:'transparent', border:'1px solid #0f0', color:'#0f0', cursor:'pointer'}}>EXIT</button>
         </div>
@@ -243,85 +161,73 @@ export default function Dashboard() {
       <div className="chaos-rule-strip">
         <div className="rule-display"><span className="rule-label">CURRENT RULE</span><span className="active-rule-text">{activeChaosRule}</span></div>
         <div className="rule-timer" style={{fontFamily:'monospace', fontSize:'1.2rem', color: chaosTimeLeft < 60 ? 'red' : '#0f0'}}>T-MINUS: {formatTime(chaosTimeLeft)}</div>
-        <button onClick={skipChaosRule} className="skip-btn">SKIP (-2 🪙)</button>
       </div>
 
       <div className="borderland-layer">
         <div className="game-console">
             <div className="gateway-panel">
                 <h2 className="panel-title">BORDERLAND PROTOCOL</h2>
+                
                 {playerData.activeGame ? (
                     <div className="active-mission-screen">
-                          <div style={{fontSize: '3rem', fontFamily: 'monospace', color: gameTimeLeft < 60 ? '#ff0000' : '#fff', border: '2px solid currentColor', padding: '10px 20px', marginBottom: '20px', textShadow: '0 0 10px currentColor'}}>
-                              {formatTime(gameTimeLeft)}
-                          </div>
-                          <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>LEVEL {playerData.activeGame.level}</h1>
-                          <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff', textShadow:'0 0 10px currentColor'}}>
-                             {GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}
-                          </h2>
-                          <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>
-                             {GAME_DATABASE[playerData.activeGame.gameId]?.description}
-                          </p>
-                          <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>
-                             LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}
-                          </div>
-                          <div style={{marginTop:'30px', color:'#888', fontStyle:'italic', fontSize:'0.9rem'}}>
-                              SURVIVE UNTIL TIMER REACHES 00:00 TO COMPLETE
-                          </div>
-                          <button onClick={quitGame} style={{marginTop:'20px', background:'#333', color:'#fff', border:'1px solid #555', padding:'10px', cursor:'pointer', fontFamily:'Orbitron'}}>
-                              FORFEIT
-                          </button>
+                          <div style={{fontSize: '3rem', fontFamily: 'monospace', color: gameTimeLeft < 60 ? '#ff0000' : '#fff', border: '2px solid currentColor', padding: '10px 20px', marginBottom: '20px', textShadow: '0 0 10px currentColor'}}>{formatTime(gameTimeLeft)}</div>
+                          <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>{playerData.activeGame.gameId}</h1>
+                          <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff'}}>{GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}</h2>
+                          <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>{GAME_DATABASE[playerData.activeGame.gameId]?.description}</p>
+                          <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}</div>
+                          <button onClick={quitGame} style={{marginTop:'20px', background:'#333', color:'#fff', border:'1px solid #555', padding:'10px', cursor:'pointer', fontFamily:'Orbitron'}}>FORFEIT</button>
                     </div>
                 ) : (
                     <div className="cards-wrapper">
-                        <div style={{position: 'relative', flex: 1}}>
-                            <button className="card-btn card-heart" onClick={() => rollDice("HEART")} disabled={loadingDice} style={{width: '100%', height: '100%'}}>
-                                <div className="suit-icon" style={{color: '#ff0055'}}>♥</div>
-                                <span style={{color:'#fff', fontSize:'1.5rem'}}>HEART</span>
-                                <div style={{fontSize:'0.7rem', color:'#888'}}>SOCIAL / EMOTIONAL</div>
-                            </button>
-                            {playerData.lastPlayedCategory === "HEART" && !playerData.unlockedSameCategory && (
-                                <div className="locked-overlay">
-                                    <span style={{color:'red', fontWeight:'bold'}}>LOCKED</span>
-                                    <div style={{fontSize:'0.8rem', color:'#ccc'}}>Must play Spade next</div>
-                                    <button className="unlock-btn" onClick={unlockCategory}>UNLOCK (-2 🪙)</button>
-                                </div>
-                            )}
-                        </div>
-                        <div style={{position: 'relative', flex: 1}}>
-                            <button className="card-btn card-spade" onClick={() => rollDice("SPADE")} disabled={loadingDice} style={{width: '100%', height: '100%'}}>
-                                <div className="suit-icon" style={{color: '#00ccff'}}>♠</div>
-                                <span style={{color:'#fff', fontSize:'1.5rem'}}>SPADE</span>
-                                <div style={{fontSize:'0.7rem', color:'#888'}}>LOGIC / INTELLECT</div>
-                            </button>
-                            {playerData.lastPlayedCategory === "SPADE" && !playerData.unlockedSameCategory && (
-                                <div className="locked-overlay">
-                                    <span style={{color:'#00ccff', fontWeight:'bold'}}>LOCKED</span>
-                                    <div style={{fontSize:'0.8rem', color:'#ccc'}}>Must play Heart next</div>
-                                    <button className="unlock-btn" onClick={unlockCategory}>UNLOCK (-2 🪙)</button>
-                                </div>
-                            )}
-                        </div>
+                        {['HEART', 'SPADE'].map(cat => (
+                           <div key={cat} style={{position: 'relative', flex: 1}}>
+                              {selectedCategory === cat ? (
+                                 <div className="level-select-grid">
+                                    <p style={{color: '#fff', marginBottom: '10px'}}>SELECT DICE LEVEL</p>
+                                    {[1,2,3,4,5,6].map(num => (
+                                       <button key={num} onClick={() => startMission(cat, num)} className="level-btn">{num}</button>
+                                    ))}
+                                    <button onClick={() => setSelectedCategory(null)} className="cancel-btn">BACK</button>
+                                 </div>
+                              ) : (
+                                 <button className={`card-btn card-${cat.toLowerCase()}`} onClick={() => setSelectedCategory(cat)} disabled={loadingDice}>
+                                    <div className="suit-icon" style={{color: cat === 'HEART' ? '#ff0055' : '#00ccff'}}>{cat === 'HEART' ? '♥' : '♠'}</div>
+                                    <span style={{color:'#fff', fontSize:'1.5rem'}}>{cat}</span>
+                                 </button>
+                              )}
+                              {playerData.lastPlayedCategory === cat && !playerData.unlockedSameCategory && <div className="locked-overlay"><span style={{color:'red'}}>LOCKED</span></div>}
+                           </div>
+                        ))}
                     </div>
                 )}
             </div>
+            
             <div className="data-sidebar">
-                <div style={{marginBottom:'20px'}}>
-                   <div style={{borderBottom:'1px solid #0f0', marginBottom:'10px', display:'flex', justifyContent:'space-between', color:'#0f0'}}>
-                       <span>LIVE RANKINGS</span><span className="blink">● LIVE</span>
-                   </div>
-                   <Leaderboard limitCount={10} />
+                <div className="sidebar-section">
+                   <div className="sidebar-header">LIVE RANKINGS <span className="blink">● LIVE</span></div>
+                   <Leaderboard limitCount={5} />
                 </div>
-                <div style={{borderTop:'1px dashed #333', paddingTop:'10px'}}>
-                    <div style={{color:'#888', marginBottom:'5px', fontSize:'0.8rem'}}>SYSTEM LOGS</div>
+
+                {/* NEW MISSION HISTORY SECTION */}
+                <div className="sidebar-section">
+                   <div className="sidebar-header">MISSION HISTORY</div>
+                   <div className="history-list">
+                      <div className="history-item">
+                         <span style={{color: '#ff0055'}}>♥</span>: {playerData.completedGames?.filter(g => g.startsWith('HEART')).map(g => g.split('_')[1]).join(', ') || 'None'}
+                      </div>
+                      <div className="history-item">
+                         <span style={{color: '#00ccff'}}>♠</span>: {playerData.completedGames?.filter(g => g.startsWith('SPADE')).map(g => g.split('_')[1]).join(', ') || 'None'}
+                      </div>
+                   </div>
+                </div>
+
+                <div className="sidebar-section">
+                    <div className="sidebar-header">SYSTEM LOGS</div>
                     {systemLogs.map((log, i) => <div key={i} className="log-entry">{log}</div>)}
                 </div>
             </div>
         </div>
       </div>
-      <footer className="chaos-footer">
-        <div className="ticker-text">WARNING: VISA EXPIRY IMMINENT // CURRENT RULE: {activeChaosRule} // PENALTY FOR FAILURE: INCREMENTAL // TRUST NO ONE // </div>
-      </footer>
     </div>
   );
 }
