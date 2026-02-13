@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { db, auth } from "../firebase";
@@ -51,11 +52,23 @@ export default function Dashboard() {
     return () => unsub();
   }, [currentUser]);
 
-  // --- 2. CHAOS RULE TIMER ---
+  // --- 2. CHAOS RULE TIMER & SCORING (RESTORED) ---
   useEffect(() => {
+    if (!currentUser?.uid) return;
+
     const syncChaosTimer = async () => {
         const now = Math.floor(Date.now() / 1000); 
         const currentCycleIndex = Math.floor(now / CHAOS_DURATION_SEC);
+        
+        // RESTORED: AWARD +1 POINT IF 10-MINUTE CYCLE COMPLETES
+        if (lastCycleRef.current !== null && currentCycleIndex > lastCycleRef.current) {
+            try {
+                const userRef = doc(db, "users", currentUser.uid);
+                await updateDoc(userRef, { score: increment(1) });
+                addLog("RULE SURVIVED: +1 SCORE");
+            } catch (err) { console.error(err); }
+        }
+
         lastCycleRef.current = currentCycleIndex;
         setChaosTimeLeft(CHAOS_DURATION_SEC - (now % CHAOS_DURATION_SEC));
         setActiveChaosRule(CHAOS_RULES[currentCycleIndex % CHAOS_RULES.length]);
@@ -63,7 +76,7 @@ export default function Dashboard() {
     syncChaosTimer();
     const timer = setInterval(syncChaosTimer, 1000);
     return () => clearInterval(timer);
-  }, []); 
+  }, [currentUser]); // Added dependency to ensure user ref exists
 
   // --- 3. MISSION TIMER ---
   useEffect(() => {
@@ -102,7 +115,6 @@ export default function Dashboard() {
     } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  // --- TOKEN DEDUCTION FOR SKIPPING RULE ---
   const skipChaosRule = async () => {
     if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS (TOKENS)."); return; }
     await updateDoc(doc(db, "users", currentUser.uid), { tokens: increment(-2) });
@@ -110,7 +122,6 @@ export default function Dashboard() {
     alert("RULE SKIPPED. COST: 2 TOKENS.");
   };
 
-  // --- TOKEN DEDUCTION FOR UNLOCKING CATEGORY ---
   const unlockCategory = async () => {
     if (playerData.tokens < 2) { alert("INSUFFICIENT VISAS TO UNLOCK."); return; }
     if(!window.confirm("Pay 2 Tokens to unlock this category?")) return;
@@ -123,7 +134,6 @@ export default function Dashboard() {
   };
 
   const startMission = async (category, level) => {
-    // If locked and not unlocked, block it (UI handles this, but double check)
     if (playerData.lastPlayedCategory === category && !playerData.unlockedSameCategory) {
         alert("LOCKED. UNLOCK FIRST.");
         return;
@@ -143,7 +153,7 @@ export default function Dashboard() {
 
   const quitGame = async () => {
       if(!window.confirm("Forfeit? No points will be awarded.")) return;
-      setGameTimeLeft(null); // Kill timer immediately
+      setGameTimeLeft(null); 
       await updateDoc(doc(db, "users", currentUser.uid), { activeGame: null });
       addLog(`MISSION FORFEITED`);
   }
@@ -187,7 +197,6 @@ export default function Dashboard() {
       <div className="borderland-layer">
         <div className="game-console">
             
-            {/* GAME PANEL */}
             <div className="gateway-panel">
                 <h2 className="panel-title">BORDERLAND PROTOCOL</h2>
                 
@@ -202,7 +211,6 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     <div className="cards-wrapper">
-                        {/* HEART CARD */}
                         <div className="suit-container">
                             {selectedCategory === 'HEART' ? (
                                 <div className="level-grid">
@@ -229,7 +237,6 @@ export default function Dashboard() {
                             )}
                         </div>
 
-                        {/* SPADE CARD */}
                         <div className="suit-container">
                             {selectedCategory === 'SPADE' ? (
                                 <div className="level-grid">
@@ -259,7 +266,6 @@ export default function Dashboard() {
                 )}
             </div>
             
-            {/* SIDEBAR */}
             <div className="data-sidebar">
                 <div className="sidebar-box">
                    <div className="box-header">LIVE RANKINGS <span className="blink">●</span></div>
