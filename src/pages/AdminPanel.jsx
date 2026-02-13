@@ -1,126 +1,142 @@
-// src/pages/AdminPanel.jsx
 import { useState, useEffect } from "react";
 import { db } from "../firebase";
-// 1. IMPORT arrayUnion
-import { collection, onSnapshot, doc, updateDoc, increment, getDoc, arrayUnion } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, increment, arrayUnion } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import "./AdminPanel.css";
+import "./AdminPanel.css"; // We will create this CSS next
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
-  const { currentUser } = useAuth();
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // --- SECURITY CHECK (Allow Admins OR Managers) ---
+  // --- 1. FETCH ALL USERS ---
   useEffect(() => {
-    const checkAdmin = async () => {
-      if (currentUser) {
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        // Check for BOTH roles
-        const role = userDoc.data()?.role;
-        if (role !== "admin" && role !== "manager") {
-          alert("ACCESS DENIED: CLEARANCE LEVEL TOO LOW.");
-          navigate("/dashboard");
-        }
-      }
-    };
-    checkAdmin();
-  }, [currentUser, navigate]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsub = onSnapshot(collection(db, "users"), (snapshot) => {
+      const userList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsers(userList);
     });
-    return unsub;
+    return () => unsub();
   }, []);
 
-  // --- ACTIONS ---
+  // --- 2. MANAGER ACTIONS ---
 
-  const manualAdjust = async (userId, amount) => {
-    const reason = prompt("Reason? (Log only)");
-    if(reason === null) return;
-    await updateDoc(doc(db, "users", userId), { tokens: increment(amount) });
-  };
-
-  const resetLocks = async (userId) => {
-    if(!window.confirm("RESET USER?")) return;
-    await updateDoc(doc(db, "users", userId), { lockedCategory: null, activeGame: null, unlockedSameCategory: false });
-  };
-
-  // --- NEW FUNCTION: MARK GAME AS COMPLETE ---
-  const markComplete = async (user) => {
-    if (!user.activeGame) return;
-    if (!window.confirm(`Confirm completion for ${user.displayName}?`)) return;
-
-    await updateDoc(doc(db, "users", user.id), {
+  // ACTION: Mark Game as Complete (Awards Point)
+  const markGameComplete = async (userId, gameData) => {
+    if(!window.confirm(`Confirm completion for ${gameData.gameId}?`)) return;
+    setLoading(true);
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, {
         activeGame: null,
-        // Add to history (Fixes Leaderboard)
-        completedGames: arrayUnion(user.activeGame.gameId)
-        // No tokens added (per your request)
-    });
+        completedGames: arrayUnion(gameData.gameId),
+        score: increment(1) // <--- CRITICAL FIX: THIS SUMS THE POINTS
+      });
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // ACTION: Cancel/Forfeit Game (No Point)
+  const cancelGame = async (userId) => {
+    if(!window.confirm("Cancel this active mission?")) return;
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        activeGame: null
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // ACTION: Add/Remove Tokens (Manual Adjustment)
+  const adjustTokens = async (userId, amount) => {
+    const reason = prompt("Reason for adjustment?");
+    if (!reason) return;
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        tokens: increment(amount)
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // --- FILTER: Only show users with Active Games or recent activity ---
+  // You can remove the filter to see everyone, but this is better for live management
+  const activePlayers = users.filter(u => u.activeGame || u.role === 'manager');
 
   return (
-    <div className="admin-container">
+    <div className="admin-shell">
       <header className="admin-header">
-        <div>
-            <h1 className="admin-title">MANAGER CONTROL</h1>
-            <div style={{color:'#666'}}>AUTHORIZED PERSONNEL ONLY</div>
-        </div>
-        <div style={{display:'flex', gap:'20px', alignItems:'center'}}>
-            <button onClick={() => navigate('/dashboard')} className="btn-back">EXIT TO DASHBOARD</button>
-        </div>
+        <h1>MANAGER CONTROL TERMINAL</h1>
+        <button onClick={() => navigate('/dashboard')} className="back-btn">RETURN TO CHAOS ROOM</button>
       </header>
-      
-      <div className="admin-table-wrapper">
+
+      <div className="admin-content">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>CITIZEN</th>
-              <th>ROLE</th>
-              <th>VISA</th>
-              <th>ACTIVE MISSION</th>
+              <th>PLAYER ID</th>
+              <th>STATUS</th>
+              <th>CURRENT MISSION</th>
               <th>ACTIONS</th>
+              <th>TOKENS</th>
             </tr>
           </thead>
           <tbody>
-            {users.map(u => (
-              <tr key={u.id}>
-                <td>
-                  <div style={{fontWeight:'bold', color:'#fff'}}>{u.displayName || "Unknown"}</div>
-                  <div style={{fontSize:'0.8rem', color:'#555'}}>{u.email}</div>
+            {users.map(user => (
+              <tr key={user.id} className={user.activeGame ? "row-active" : ""}>
+                <td className="id-col">
+                    {user.email?.split('@')[0]}
+                    {user.role === 'manager' && <span className="tag-mgr">MGR</span>}
+                    <div className="score-sub">Score: {user.score || 0}</div>
                 </td>
-                <td>
-                  <span className={`badge ${u.role === 'admin' ? 'badge-admin' : u.role === 'manager' ? 'badge-manager' : 'badge-user'}`}>
-                    {u.role}
-                  </span>
+                
+                <td className="status-col">
+                    {user.activeGame ? <span className="status-live">● ACTIVE</span> : <span className="status-idle">IDLE</span>}
                 </td>
-                <td style={{color: '#ffd700'}}>{u.tokens}</td>
-                <td>
-                  {u.activeGame ? (
-                    <div style={{color:'#00ff41', fontWeight:'bold'}}>
-                      {u.activeGame.gameId}
-                    </div>
-                  ) : (
-                    <span style={{color:'#555'}}>--</span>
-                  )}
-                </td>
-                <td style={{display:'flex', gap:'5px'}}>
-                  
-                  {/* SHOW COMPLETE BUTTON ONLY IF PLAYING */}
-                  {u.activeGame && (
-                      <button 
-                        onClick={() => markComplete(u)} 
-                        style={{background:'#00ff41', color:'#000', border:'none', padding:'5px 10px', cursor:'pointer', fontWeight:'bold'}}
-                      >
-                        ✔ COMPLETE
-                      </button>
-                  )}
 
-                  <button onClick={() => manualAdjust(u.id, 50)} className="action-btn btn-plus">+50</button>
-                  <button onClick={() => manualAdjust(u.id, -50)} className="action-btn btn-minus">-50</button>
-                  <button onClick={() => resetLocks(u.id)} className="action-btn btn-reset">RESET</button>
+                <td className="mission-col">
+                    {user.activeGame ? (
+                        <div className="mission-info">
+                            <span className="m-id">{user.activeGame.gameId}</span>
+                            <span className="m-cat">{user.activeGame.category}</span>
+                            <span className="m-lvl">LVL {user.activeGame.level}</span>
+                        </div>
+                    ) : "---"}
+                </td>
+
+                <td className="actions-col">
+                    {user.activeGame && (
+                        <div className="action-buttons">
+                            <button 
+                                className="btn-verify" 
+                                onClick={() => markGameComplete(user.id, user.activeGame)}
+                                disabled={loading}
+                            >
+                                ✅ VERIFY (+1)
+                            </button>
+                            <button 
+                                className="btn-cancel" 
+                                onClick={() => cancelGame(user.id)}
+                            >
+                                ❌ REVOKE
+                            </button>
+                        </div>
+                    )}
+                </td>
+
+                <td className="tokens-col">
+                    <span style={{color:'#ffd700'}}>{user.tokens}</span>
+                    <div className="token-btns">
+                        <button onClick={() => adjustTokens(user.id, 5)} className="t-btn">+</button>
+                        <button onClick={() => adjustTokens(user.id, -5)} className="t-btn">-</button>
+                    </div>
                 </td>
               </tr>
             ))}
