@@ -18,7 +18,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [playerData, setPlayerData] = useState(null);
   const [loadingDice, setLoadingDice] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null); // Tracking click for level selection
+  const [selectedCategory, setSelectedCategory] = useState(null); // TRACKS CLICK FOR DICE INPUT
    
   const [activeChaosRule, setActiveChaosRule] = useState("INITIALIZING...");
   const [chaosTimeLeft, setChaosTimeLeft] = useState(CHAOS_DURATION_SEC);
@@ -74,18 +74,6 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [currentUser]); 
 
-  useEffect(() => {
-    if (gameTimeLeft === null) return; 
-    if (gameTimeLeft <= 0) { handleTimeSuccess(); return; }
-    const gameTimer = setInterval(() => {
-        setGameTimeLeft((prev) => {
-            if (prev <= 1) { handleTimeSuccess(); return 0; }
-            return prev - 1;
-        });
-    }, 1000);
-    return () => clearInterval(gameTimer);
-  }, [gameTimeLeft]);
-
   const addLog = (msg) => {
     const time = new Date().toLocaleTimeString();
     setSystemLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
@@ -93,7 +81,6 @@ export default function Dashboard() {
 
   const handleTimeSuccess = async () => {
     if (!playerData?.activeGame) return;
-    if (loadingDice) return; 
     setLoadingDice(true);
     try {
         const userRef = doc(db, "users", currentUser.uid);
@@ -108,11 +95,11 @@ export default function Dashboard() {
     } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  // Start mission based on Manual Level Selection
+  // START MISSION AFTER MANUAL DICE ENTRY
   const startMission = async (category, level) => {
     const lastCategory = playerData.lastPlayedCategory;
     if (lastCategory === category && !playerData.unlockedSameCategory) {
-        alert("PROTOCOL VIOLATION: Alternate categories or pay 2 tokens.");
+        alert("PROTOCOL VIOLATION: Alternate categories.");
         return;
     }
     setLoadingDice(true);
@@ -129,13 +116,6 @@ export default function Dashboard() {
     } catch (err) { console.error(err); } finally { setLoadingDice(false); }
   };
 
-  const quitGame = async () => {
-      if(!window.confirm("Give up? No rewards for quitters.")) return;
-      const userRef = doc(db, "users", currentUser.uid);
-      await updateDoc(userRef, { activeGame: null });
-      addLog(`MISSION ABORTED`);
-  }
-
   const handleLogout = async () => { await signOut(auth); navigate("/"); };
 
   if (!playerData) return <div style={{background:'#000', color:'#0f0', height:'100vh', padding:'20px'}}>INITIALIZING...</div>;
@@ -149,73 +129,72 @@ export default function Dashboard() {
             <div className="blink-dot"></div><span>CHAOS ROOM // ONLINE</span>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:'20px'}}>
-            {(playerData.role === 'admin' || playerData.role === 'manager') && (
-                <button onClick={() => navigate('/admin')} style={{background: '#ff0055', color: '#fff', border: 'none', padding: '5px 15px', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Orbitron', fontSize: '0.8rem', boxShadow: '0 0 10px #ff0055'}}>MANAGER PANEL</button>
-            )}
             <div style={{color: '#00ff41', fontFamily: 'Orbitron', fontSize:'1.2rem'}}>SCORE: {currentScore}</div>
             <div className="user-id">ID: {currentUser.email.split('@')[0]} | TOKENS: <span style={{color: '#ffd700'}}>{playerData.tokens}</span></div>
-            <button onClick={handleLogout} style={{background:'transparent', border:'1px solid #0f0', color:'#0f0', cursor:'pointer'}}>EXIT</button>
+            <button onClick={handleLogout} className="exit-btn">EXIT</button>
         </div>
       </header>
 
       <div className="chaos-rule-strip">
         <div className="rule-display"><span className="rule-label">CURRENT RULE</span><span className="active-rule-text">{activeChaosRule}</span></div>
-        <div className="rule-timer" style={{fontFamily:'monospace', fontSize:'1.2rem', color: chaosTimeLeft < 60 ? 'red' : '#0f0'}}>T-MINUS: {formatTime(chaosTimeLeft)}</div>
+        <div className="rule-timer">T-MINUS: {formatTime(chaosTimeLeft)}</div>
       </div>
 
       <div className="borderland-layer">
         <div className="game-console">
+            {/* MAIN PANEL */}
             <div className="gateway-panel">
                 <h2 className="panel-title">BORDERLAND PROTOCOL</h2>
                 
                 {playerData.activeGame ? (
                     <div className="active-mission-screen">
-                          <div style={{fontSize: '3rem', fontFamily: 'monospace', color: gameTimeLeft < 60 ? '#ff0000' : '#fff', border: '2px solid currentColor', padding: '10px 20px', marginBottom: '20px', textShadow: '0 0 10px currentColor'}}>{formatTime(gameTimeLeft)}</div>
-                          <h1 style={{fontSize:'4rem', margin:0, color:'#fff'}}>{playerData.activeGame.gameId}</h1>
+                          <div className="timer-big">{formatTime(gameTimeLeft)}</div>
+                          <h1 className="mission-id">{playerData.activeGame.gameId}</h1>
                           <h2 style={{color: playerData.activeGame.category === 'HEART' ? '#ff0055' : '#00ccff'}}>{GAME_DATABASE[playerData.activeGame.gameId]?.title || "UNKNOWN"}</h2>
-                          <p style={{color:'#fff', maxWidth:'80%', fontSize:'1.1rem'}}>{GAME_DATABASE[playerData.activeGame.gameId]?.description}</p>
-                          <div style={{marginTop:'20px', background:'#000', padding:'10px 20px', color:'#0f0', border:'1px solid #0f0'}}>LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}</div>
-                          <button onClick={quitGame} style={{marginTop:'20px', background:'#333', color:'#fff', border:'1px solid #555', padding:'10px', cursor:'pointer', fontFamily:'Orbitron'}}>FORFEIT</button>
+                          <p>{GAME_DATABASE[playerData.activeGame.gameId]?.description}</p>
+                          <div className="loc-box">LOC: {GAME_DATABASE[playerData.activeGame.gameId]?.location}</div>
                     </div>
                 ) : (
                     <div className="cards-wrapper">
                         {['HEART', 'SPADE'].map(cat => (
-                           <div key={cat} style={{position: 'relative', flex: 1}}>
+                           <div key={cat} className="card-container">
                               {selectedCategory === cat ? (
                                  <div className="level-select-grid">
-                                    <p style={{color: '#fff', marginBottom: '10px'}}>SELECT DICE LEVEL</p>
-                                    {[1,2,3,4,5,6].map(num => (
-                                       <button key={num} onClick={() => startMission(cat, num)} className="level-btn">{num}</button>
-                                    ))}
+                                    <p>SELECT DICE LEVEL</p>
+                                    <div className="level-btns">
+                                        {[1,2,3,4,5,6].map(num => (
+                                           <button key={num} onClick={() => startMission(cat, num)} className="level-btn">{num}</button>
+                                        ))}
+                                    </div>
                                     <button onClick={() => setSelectedCategory(null)} className="cancel-btn">BACK</button>
                                  </div>
                               ) : (
                                  <button className={`card-btn card-${cat.toLowerCase()}`} onClick={() => setSelectedCategory(cat)} disabled={loadingDice}>
                                     <div className="suit-icon" style={{color: cat === 'HEART' ? '#ff0055' : '#00ccff'}}>{cat === 'HEART' ? '♥' : '♠'}</div>
-                                    <span style={{color:'#fff', fontSize:'1.5rem'}}>{cat}</span>
+                                    <span className="suit-name">{cat}</span>
+                                    {playerData.lastPlayedCategory === cat && !playerData.unlockedSameCategory && <div className="locked-badge">LOCKED</div>}
                                  </button>
                               )}
-                              {playerData.lastPlayedCategory === cat && !playerData.unlockedSameCategory && <div className="locked-overlay"><span style={{color:'red'}}>LOCKED</span></div>}
                            </div>
                         ))}
                     </div>
                 )}
             </div>
             
+            {/* SIDEBAR */}
             <div className="data-sidebar">
                 <div className="sidebar-section">
                    <div className="sidebar-header">LIVE RANKINGS <span className="blink">● LIVE</span></div>
                    <Leaderboard limitCount={5} />
                 </div>
 
-                {/* NEW MISSION HISTORY SECTION */}
                 <div className="sidebar-section">
                    <div className="sidebar-header">MISSION HISTORY</div>
                    <div className="history-list">
-                      <div className="history-item">
+                      <div className="history-row">
                          <span style={{color: '#ff0055'}}>♥</span>: {playerData.completedGames?.filter(g => g.startsWith('HEART')).map(g => g.split('_')[1]).join(', ') || 'None'}
                       </div>
-                      <div className="history-item">
+                      <div className="history-row">
                          <span style={{color: '#00ccff'}}>♠</span>: {playerData.completedGames?.filter(g => g.startsWith('SPADE')).map(g => g.split('_')[1]).join(', ') || 'None'}
                       </div>
                    </div>
@@ -223,7 +202,9 @@ export default function Dashboard() {
 
                 <div className="sidebar-section">
                     <div className="sidebar-header">SYSTEM LOGS</div>
-                    {systemLogs.map((log, i) => <div key={i} className="log-entry">{log}</div>)}
+                    <div className="logs-container">
+                        {systemLogs.map((log, i) => <div key={i} className="log-entry">{log}</div>)}
+                    </div>
                 </div>
             </div>
         </div>
