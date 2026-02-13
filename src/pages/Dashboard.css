@@ -258,3 +258,71 @@ body {
   .cards-wrapper { flex-direction: column; height: 400px; }
   .borderland-layer { overflow-y: auto; align-items: flex-start; }
 }
+/* ADD TO Dashboard.css */
+
+.level-select-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #000;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    border: 1px solid var(--chaos-green);
+}
+
+.level-btns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.level-btn {
+    width: 50px;
+    height: 50px;
+    background: transparent;
+    border: 1px solid var(--chaos-green);
+    color: var(--chaos-green);
+    cursor: pointer;
+    font-family: 'Orbitron';
+    font-size: 1.2rem;
+}
+
+.level-btn:hover {
+    background: var(--chaos-green);
+    color: #000;
+}
+
+.history-list {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.history-row {
+    font-family: 'Share Tech Mono';
+    font-size: 1rem;
+    margin: 5px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #222;
+}
+
+.sidebar-section {
+    margin-bottom: 20px;
+}
+
+.sidebar-header {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 8px;
+    font-family: 'Orbitron';
+}
+
+.locked-badge {
+    position: absolute;
+    bottom: 10px;
+    color: red;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
