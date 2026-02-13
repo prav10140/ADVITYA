@@ -324,4 +324,98 @@ body {
   padding: 5px 10px;
   cursor: pointer;
 }
+
 .unlock-btn:hover { background: #fff; color: #000; }
+
+/* --- LEVEL SELECTION INTERFACE --- */
+.level-select-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  height: 100%;
+  width: 100%;
+  border: 2px solid #333;
+  padding: 20px;
+  animation: scanline 0.2s linear infinite;
+}
+
+.level-select-grid p {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 2px;
+  text-shadow: 0 0 5px #fff;
+}
+
+.level-btn {
+  width: 60px;
+  height: 60px;
+  margin: 5px;
+  background: transparent;
+  border: 1px solid #0f0;
+  color: #0f0;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.level-btn:hover {
+  background: #0f0;
+  color: #000;
+  box-shadow: 0 0 15px #0f0;
+}
+
+.cancel-btn {
+  margin-top: 15px;
+  background: transparent;
+  border: 1px solid #ff0055;
+  color: #ff0055;
+  padding: 5px 20px;
+  cursor: pointer;
+  font-family: 'Orbitron';
+}
+
+/* --- SIDEBAR SECTIONS --- */
+.sidebar-section {
+  margin-bottom: 25px;
+  border: 1px solid #222;
+  background: rgba(10, 10, 10, 0.8);
+  padding: 10px;
+}
+
+.sidebar-header {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  color: #888;
+  border-bottom: 1px solid #333;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* --- MISSION HISTORY STYLING --- */
+.history-list {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+}
+
+.history-item {
+  margin-bottom: 8px;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #444;
+}
+
+.history-item span {
+  font-size: 1.2rem;
+  margin-right: 10px;
+}
+
+/* Animation for the Scanline effect */
+@keyframes scanline {
+  0% { box-shadow: inset 0 0 5px rgba(0,255,0,0.1); }
+  50% { box-shadow: inset 0 0 10px rgba(0,255,0,0.2); }
+  100% { box-shadow: inset 0 0 5px rgba(0,255,0,0.1); }
+}
