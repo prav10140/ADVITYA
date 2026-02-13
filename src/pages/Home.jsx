@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import { useNavigate } from "react-router-dom";
 import "./Home.css";
 
@@ -5,7 +6,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   return (
-    <div>
+    <div className="home-wrapper"> {/* Wrap in a class for styling */}
       <nav className="navbar">
         <div className="nav-logo">GFG Student Chapter Present</div>
         <button onClick={() => navigate("/login")} className="nav-btn">LOGIN</button>
@@ -53,5 +54,4 @@ export default function Home() {
       </footer>
     </div>
   );
-
 }
