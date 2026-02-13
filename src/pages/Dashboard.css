@@ -2,10 +2,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
 :root {
-  --chaos-green: #00ff41; /* Matrix/Terminal Green for Chaos Room */
-  --neon-red: #ff0055;    /* Heart Game Color */
-  --neon-blue: #00ccff;   /* Spade Game Color */
+  --chaos-green: #00ff41; /* Matrix Green */
+  --neon-red: #ff0055;    /* Heart/Rule Color */
+  --neon-blue: #00ccff;   /* Spade Color */
+  --neon-gold: #ffd700;   /* Token Color */
   --bg-black: #050505;
+  --panel-bg: rgba(10, 10, 10, 0.9);
 }
 
 body {
@@ -13,10 +15,10 @@ body {
   background-color: var(--bg-black);
   color: var(--chaos-green);
   font-family: 'Share Tech Mono', monospace;
-  overflow: hidden; /* Lock scroll to feel like a screen */
+  overflow: hidden;
 }
 
-/* --- LAYER 1: THE CHAOS ROOM (Always Active Shell) --- */
+/* --- CRT SCANLINE & SHELL --- */
 .chaos-room-shell {
   position: fixed;
   inset: 0;
@@ -26,31 +28,33 @@ body {
   z-index: 1;
 }
 
-/* CRT Scanline Effect */
 .chaos-room-shell::before {
   content: " ";
   display: block;
   position: absolute;
   top: 0; left: 0; bottom: 0; right: 0;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-  z-index: 2;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 100;
   background-size: 100% 2px, 3px 100%;
   pointer-events: none;
+  opacity: 0.3;
 }
 
-/* Header */
+/* --- HEADER --- */
 .chaos-header {
   display: flex;
   justify-content: space-between;
-  padding: 15px 30px;
-  border-bottom: 1px solid var(--chaos-green);
-  background: rgba(0, 20, 0, 0.8);
+  align-items: center;
+  padding: 10px 25px;
+  border-bottom: 1px solid #1a1a1a;
+  background: #000;
 }
 
 .system-status {
   display: flex;
-  gap: 20px;
   align-items: center;
+  gap: 15px;
 }
 
 .blink-dot {
@@ -61,267 +65,299 @@ body {
   animation: blink 1s infinite;
 }
 
-/* Footer Ticker */
-.chaos-footer {
-  border-top: 1px solid var(--chaos-green);
-  background: #000;
-  padding: 5px 0;
-  overflow: hidden;
-  white-space: nowrap;
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
-.ticker-text {
-  display: inline-block;
-  animation: scroll-left 20s linear infinite;
+.stat-box {
+  font-family: 'Orbitron';
   font-size: 0.9rem;
   color: var(--chaos-green);
 }
 
-/* --- LAYER 2: BORDERLAND GAMES (The Interface) --- */
-.borderland-layer {
-  flex: 1; /* Takes remaining space */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  z-index: 10;
-  padding: 20px;
-}
+.token-text { color: var(--neon-gold); }
 
-.game-console {
-  display: grid;
-  grid-template-columns: 2fr 1fr; /* Game Selection | Live Data */
-  gap: 30px;
-  width: 100%;
-  max-width: 1200px;
-  height: 80%;
-}
-
-/* The Game Cards Container */
-.gateway-panel {
-  border: 1px solid #333;
-  padding: 30px;
-  background: rgba(10, 10, 10, 0.8);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.panel-title {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2rem;
+.manager-panel-btn {
+  background: var(--neon-red);
   color: #fff;
-  margin-bottom: 20px;
-  text-shadow: 0 0 10px rgba(255,255,255,0.5);
-  border-bottom: 1px solid #444;
-  padding-bottom: 10px;
-}
-
-.cards-wrapper {
-  display: flex;
-  gap: 20px;
-  height: 100%;
-}
-
-.card-btn {
-  flex: 1;
-  background: #000;
-  border: 1px solid #444;
+  border: none;
+  padding: 4px 12px;
+  font-family: 'Orbitron';
+  font-weight: 900;
+  font-size: 0.7rem;
   cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  box-shadow: 0 0 10px var(--neon-red);
+  margin-right: 10px;
 }
 
-.card-btn:hover {
-  transform: scale(1.02);
-  border-color: #fff;
-}
-
-.card-heart:hover { box-shadow: 0 0 30px var(--neon-red); border-color: var(--neon-red); }
-.card-spade:hover { box-shadow: 0 0 30px var(--neon-blue); border-color: var(--neon-blue); }
-
-.suit-icon {
-  font-size: 6rem;
-  margin-bottom: 10px;
-  z-index: 2;
-}
-
-/* Data Sidebar */
-.data-sidebar {
+.exit-btn {
+  background: transparent;
   border: 1px solid var(--chaos-green);
-  padding: 20px;
-  font-size: 0.8rem;
-  overflow-y: auto;
-  background: rgba(0, 20, 0, 0.2);
+  color: var(--chaos-green);
+  padding: 2px 10px;
+  cursor: pointer;
 }
 
-.log-entry {
-  margin-bottom: 5px;
-  border-bottom: 1px dashed #333;
-  padding-bottom: 2px;
-}
-
-/* Active Mission Override */
-.active-mission-screen {
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 0, 0, 0.1);
-  border: 2px solid red;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  animation: alert-pulse 2s infinite;
-}
-
-/* Animations */
-@keyframes blink { 50% { opacity: 0; } }
-@keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-@keyframes alert-pulse { 0% { box-shadow: inset 0 0 0 red; } 50% { box-shadow: inset 0 0 50px red; } 100% { box-shadow: inset 0 0 0 red; } }
-
-/* Mobile */
-@media (max-width: 900px) {
-  .game-console { grid-template-columns: 1fr; overflow-y: scroll; }
-  .cards-wrapper { flex-direction: column; }
-}
-
-.boot-screen {
-  position: fixed;
-  inset: 0;
-  background-color: #000;
-  color: #00ff41; /* Hacker Green */
-  font-family: 'Share Tech Mono', monospace;
-  padding: 40px;
-  z-index: 9999; /* Always on top */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  overflow: hidden;
-}
-
-.boot-line {
-  margin-bottom: 5px;
-  opacity: 0;
-  animation: type-line 0.1s forwards;
-}
-
-.highlight {
-  color: #fff;
-  background: #00ff41;
-  padding: 0 5px;
-}
-
-.access-granted {
-  font-size: 3rem;
-  color: #00ff41;
-  border: 2px solid #00ff41;
-  padding: 20px;
-  margin-top: 50px;
-  text-align: center;
-  animation: flash-green 0.5s infinite;
-}
-
-@keyframes type-line {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes flash-green {
-  0%, 100% { opacity: 1; background: transparent; color: #00ff41; }
-  50% { opacity: 1; background: #00ff41; color: #000; }
-}
-
+/* --- RULE STRIP --- */
 .chaos-rule-strip {
   background: #000;
   border-bottom: 2px solid var(--neon-red);
-  padding: 15px;
+  padding: 12px 25px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: relative;
-  overflow: hidden;
 }
 
-/* Moving hazard stripes background */
-.chaos-rule-strip::before {
+.chaos-rule-strip::after {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255, 0, 85, 0.1),
-    rgba(255, 0, 85, 0.1) 10px,
-    rgba(0, 0, 0, 0.1) 10px,
-    rgba(0, 0, 0, 0.1) 20px
-  );
-  z-index: 0;
+  inset: 0;
+  background: repeating-linear-gradient(45deg, rgba(255,0,85,0.05) 0, rgba(255,0,85,0.05) 10px, transparent 10px, transparent 20px);
+  pointer-events: none;
 }
 
-.rule-display {
-  z-index: 1;
+.rule-info {
+    display: flex;
+    align-items: center;
+}
+
+.current-rule-label {
+  background: var(--neon-red);
+  color: #fff;
+  padding: 4px 10px;
+  font-family: 'Orbitron';
+  font-weight: bold;
+  font-size: 0.8rem;
+  margin-right: 15px;
+}
+
+.rule-name {
+  color: #fff;
+  font-family: 'Orbitron';
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.rule-timer-container {
   display: flex;
   align-items: center;
   gap: 20px;
-  width: 100%;
 }
 
-.rule-label {
-  background: var(--neon-red);
-  color: #fff;
-  padding: 5px 10px;
-  font-weight: bold;
-  font-family: 'Orbitron', sans-serif;
-  animation: pulse 1s infinite;
-}
-
-.active-rule-text {
+.timer-text {
+  color: var(--chaos-green);
+  font-family: 'Share Tech Mono';
   font-size: 1.2rem;
-  color: #fff;
-  font-weight: bold;
-  text-transform: uppercase;
-  flex-grow: 1;
 }
 
 .skip-btn {
   background: transparent;
   border: 1px solid var(--neon-gold);
   color: var(--neon-gold);
-  padding: 5px 15px;
-  font-size: 0.8rem;
+  padding: 2px 10px;
+  font-size: 0.7rem;
   cursor: pointer;
-  z-index: 2;
 }
 
-.skip-btn:hover {
-  background: var(--neon-gold);
-  color: #000;
+/* --- MAIN INTERFACE LAYOUT --- */
+.borderland-layer {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
 }
 
-/* Locked Overlay for Alternating Rule */
-.locked-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.9);
+.game-console {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 25px;
+  width: 100%;
+  max-width: 1400px;
+}
+
+/* --- BORDERLAND PANEL --- */
+.gateway-panel {
+  background: var(--panel-bg);
+  border: 1px solid #1a1a1a;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; 
+}
+
+.panel-title {
+  font-family: 'Orbitron';
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 25px;
+  border-bottom: 1px solid #222;
+  padding-bottom: 10px;
+  margin-top: 0; 
+  align-self: flex-start;
+  width: 100%;
+}
+
+/* --- CARD WRAPPER & CARDS --- */
+.cards-wrapper {
+  display: flex;
+  gap: 20px;
+  align-items: center; 
+  justify-content: center;
+  flex: 1; 
+}
+
+.suit-container { 
+  max-width: 300px; /* Limits width so they don't get too wide */
+  flex: 1; 
+  position: relative; 
+}
+
+.suit-card {
+  width: 100%;
+  background: #000;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.3s;
+  /* COMPACT HEIGHT FIX: */
+  padding: 35px 20px; 
+}
+
+.suit-card:hover { border-color: #fff; transform: translateY(-5px); }
+.suit-symbol { font-size: 4rem; margin-bottom: 10px; }
+.suit-label { font-family: 'Orbitron'; font-size: 1.3rem; color: #fff; }
+.suit-subtitle { font-size: 0.6rem; color: #555; margin-top: 5px; }
+
+.lock-tag {
+    position: absolute;
+    bottom: 10px;
+    color: red;
+    font-size: 0.8rem;
+    font-weight: bold;
+    font-family: 'Orbitron';
+}
+
+/* --- DICE INPUT GRID --- */
+.level-grid-overlay {
+  background: #000;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--chaos-green);
+  padding: 20px 0;
+}
+
+.dice-instruction { color: #fff; font-size: 0.7rem; margin-bottom: 15px; }
+
+.dice-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.dice-btn {
+  width: 45px;
+  height: 45px;
+  background: transparent;
+  border: 1px solid var(--chaos-green);
+  color: var(--chaos-green);
+  font-family: 'Orbitron';
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.dice-btn:hover { background: var(--chaos-green); color: #000; }
+
+.back-btn {
+  margin-top: 15px;
+  background: transparent;
+  border: none;
+  color: #444;
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* --- SIDEBAR MODULES --- */
+.data-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar-box {
+  background: #000;
+  border: 1px solid #1a1a1a;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.sidebar-header {
+  font-family: 'Orbitron';
+  font-size: 0.7rem;
+  color: #444;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* History Content */
+.history-content {
+  background: rgba(255,255,255,0.02);
+  padding: 10px;
+  font-family: 'Share Tech Mono';
+}
+
+.history-item { margin: 8px 0; font-size: 1rem; }
+.icon-pink { color: var(--neon-red); margin-right: 10px; }
+.icon-blue { color: var(--neon-blue); margin-right: 10px; }
+
+/* Logs Container */
+.logs-container {
+  height: 120px;
+  overflow-y: auto;
+  font-size: 0.7rem;
+}
+
+.log-line { color: #555; margin-bottom: 4px; border-left: 1px solid #222; padding-left: 8px; }
+
+/* --- ACTIVE MISSION SCREEN --- */
+.active-mission-screen {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 0, 85, 0.03);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  z-index: 10;
-  text-align: center;
+  border: 1px solid var(--neon-red);
+  padding: 30px; 
 }
 
-.unlock-btn {
-  margin-top: 10px;
-  background: #333;
-  color: #fff;
-  border: 1px solid #fff;
-  padding: 5px 10px;
-  cursor: pointer;
+.game-countdown { font-size: 4rem; color: #fff; margin-bottom: 20px; text-shadow: 0 0 20px var(--neon-red); }
+.mission-title { font-family: 'Orbitron'; color: #fff; font-size: 2.5rem; margin: 0; }
+.loc-display { margin-top: 20px; padding: 5px 15px; border: 1px dashed var(--chaos-green); color: var(--chaos-green); }
+.forfeit-btn { margin-top: 30px; background: #333; color: #fff; border: 1px solid #555; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; }
+
+/* Footer */
+.chaos-footer { background: #000; border-top: 1px solid #111; padding: 5px 0; }
+.ticker-text { color: var(--chaos-green); font-size: 0.7rem; white-space: nowrap; animation: ticker 30s linear infinite; }
+
+@keyframes ticker { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Mobile Adjustments */
+@media (max-width: 1000px) {
+  .game-console { grid-template-columns: 1fr; overflow-y: auto; }
+  .cards-wrapper { flex-direction: column; height: auto; gap: 15px; }
+  .suit-card { padding: 30px 20px; }
 }
-.unlock-btn:hover { background: #fff; color: #000; }
