@@ -1,0 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+.login-container { height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; font-family: 'Share Tech Mono', monospace; background-image: radial-gradient(#222 1px, transparent 1px); background-size: 30px 30px; }
+.login-card { background: rgba(20,20,20,0.9); border: 1px solid #ff003c; padding: 40px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 0 30px rgba(255,0,60,0.2); }
+.title-main { font-size: 3rem; color: #fff; margin: 0; }
+.title-sub { font-size: 1rem; color: #ff003c; letter-spacing: 5px; margin-bottom: 20px; }
+.auth-toggle { display: flex; border-bottom: 1px solid #333; margin-bottom: 20px; }
+.auth-toggle button { flex: 1; background: transparent; border: none; color: #666; padding: 10px; cursor: pointer; font-family: inherit; font-size: 1rem; }
+.auth-toggle button.active { color: #fff; border-bottom: 2px solid #ff003c; }
+.input-group input { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 10px; margin-bottom: 15px; font-family: inherit; }
+.btn-enter { width: 100%; background: #fff; color: #000; border: none; padding: 15px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+.btn-enter:hover { background: #ff003c; color: #fff; }
+.btn-google { width: 100%; background: #333; color: #fff; border: none; padding: 10px; margin-top: 10px; cursor: pointer; }
+.error-msg { color: #ff003c; margin-bottom: 10px; font-size: 0.8rem; }
